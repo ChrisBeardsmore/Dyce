@@ -18,4 +18,17 @@ def insert_row(conn, table, data_dict):
 def select_all(conn, table):
     cursor = conn.cursor()
     cursor.execute(f"SELECT * FROM {table}")
-    return cursor.fetchall()       
+    return cursor.fetchall()   
+
+from sqlite_utils import get_connection, create_memory_table, log_gpt_memory, get_memory
+
+conn = get_connection()
+create_memory_table(conn)  # Set up the table if it doesn't exist
+
+# Log a message
+log_gpt_memory(conn, app="gas", message="Updated margin logic in gpricebook.py")
+
+# View recent logs
+logs = get_memory(conn, app="gas")
+for row in logs:
+    print(row)
