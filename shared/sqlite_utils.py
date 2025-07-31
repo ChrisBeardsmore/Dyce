@@ -15,7 +15,7 @@ def insert_row(conn, table, data_dict):
     with conn:
         conn.execute(sql, values)
         
- def select_all(conn, table):
+def select_all(conn, table):
     cursor = conn.cursor()
     cursor.execute(f"SELECT * FROM {table}")
     return cursor.fetchall()       
