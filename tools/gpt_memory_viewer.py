@@ -1,18 +1,13 @@
 import sys
 import os
+import streamlit as st
 
-# Get the absolute path to the repo root
-repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-shared_path = os.path.join(repo_root, "shared")
-
-# Add shared folder to Python's module search path
+# Add 'shared' directory to Python's module path
+current_dir = os.path.dirname(__file__)
+shared_path = os.path.abspath(os.path.join(current_dir, "..", "shared"))
 sys.path.append(shared_path)
 
-from sqlite_utils import get_connection, get_memory, log_gpt_noteimport sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import streamlit as st
-from sqlite_test_patch import get_connection, get_memory, log_gpt_note
+from sqlite_utils import get_connection, get_memory, log_gpt_note
 
 st.set_page_config(page_title="GPT Memory Viewer", layout="centered")
 st.title("🧠 GPT Memory Log")
@@ -21,7 +16,7 @@ st.title("🧠 GPT Memory Log")
 apps = ["contract", "gas", "power", "directgas", "directpower", "tools"]
 selected_app = st.sidebar.selectbox("Select App", apps)
 
-# Show logs for selected app
+# Show logs
 conn = get_connection()
 logs = get_memory(conn, app=selected_app)
 
@@ -34,7 +29,7 @@ else:
 
 st.markdown("---")
 
-# Add new memory log
+# Add new log entry
 with st.form("log_form"):
     new_message = st.text_area("Add a memory note", height=100)
     submitted = st.form_submit_button("Log it")
