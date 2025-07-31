@@ -26,6 +26,8 @@ st.image(LOGO_PATH, width=200)
 
 st.title(f"⚡ Dyce Contract Decision Engine (v{VERSION})")
 
+CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx
+
 @st.cache_data
 def load_config():
     config_df = pd.read_excel(CONFIG_URL, sheet_name='CreditCriteria')
