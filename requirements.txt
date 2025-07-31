@@ -8,4 +8,4 @@
 black
 flake8
 pytest
-sqlite3
+
