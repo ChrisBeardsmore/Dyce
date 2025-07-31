@@ -1,4 +1,14 @@
-import sys, os
+import sys
+import os
+
+# Get the absolute path to the repo root
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+shared_path = os.path.join(repo_root, "shared")
+
+# Add shared folder to Python's module search path
+sys.path.append(shared_path)
+
+from sqlite_utils import get_connection, get_memory, log_gpt_noteimport sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
