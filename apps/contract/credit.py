@@ -4,210 +4,197 @@ from io import BytesIO
 from datetime import datetime
 from fpdf import FPDF
 
-# --- Page Setup ---
-st.set_page_config(page_title="Dyce Contract Decision Engine V2 2025", layout="wide")
-VERSION = "V2 - 2025"
-LOGO_PATH = "DYCE-DARK BG.png"
-SIC_CODES_URL = "https://raw.githubusercontent.com/ChrisBeardsmore/Gas-Pricing/main/Sic%20Codes.xlsx"
+st.set_page_config(page_title="Dyce Contract Decision Engine V2", layout="wide")
 
-# --- Styles ---
+VERSION = "2.0 - July 2025"
+LOGO_PATH = "DYCE-DARK BG.png"
+
+CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx"
+SIC_CODES_URL = "inputs/Sic Codes.xlsx"
+
 st.markdown("""
     <style>
-        .stApp {
-            background-color: white;
-            color: rgb(15,42,52);
-        }
-        label, .stMarkdown, .css-1cpxqw2,
-        .stRadio > div, div[data-baseweb="radio"] {
-            color: rgb(15,42,52) !important;
-        }
+        .stApp { background-color: white; color: rgb(15,42,52); }
+        label { color: rgb(15,42,52) !important; }
         div.stButton > button, div.stDownloadButton > button {
-            background-color: rgb(222,0,185) !important;
-            color: white !important;
+            background-color: rgb(222,0,185) !important; color: white !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
 st.image(LOGO_PATH, width=200)
-st.title(f"⚡ Dyce Contract Decision Engine V2 2025 ({VERSION})")
 
-# --- Load SIC Codes ---
+st.title(f"⚡ Dyce Contract Decision Engine (v{VERSION})")
+
 @st.cache_data
-def load_sic():
+def load_config():
+    config_df = pd.read_excel(CONFIG_URL, sheet_name='CreditCriteria')
+    approval_df = pd.read_excel(CONFIG_URL, sheet_name='ApprovalMatrix')
+    config = dict(zip(config_df['Parameter'], config_df['Value']))
+    return config, approval_df
+
+@st.cache_data
+def load_sic_codes():
     df = pd.read_excel(SIC_CODES_URL)
     df['SIC_Code'] = df['SIC_Code'].astype(str).str.strip()
     return df
 
-sic_df = load_sic()
+config, approval_matrix_df = load_config()
+sic_df = load_sic_codes()
 
-# --- Inputs ---
-st.header("1️⃣ Business Details")
-username = st.text_input("Username")  # NEW FIELD
-company_name = st.text_input("Company Name")
-creditsafe_score = st.number_input("Creditsafe Score", 0, 100)
-recommended_limit = st.number_input("Creditsafe Recommended Limit (£)", 0.0)
-years_trading = st.number_input("Years Trading", 0, 100)
-smet_compatible = st.selectbox("Is Meter SMET-Compatible?", ["Yes", "No"])
-has_ccjs = st.selectbox("Any CCJs or Defaults?", ["Yes", "No"])
-payment_terms = st.selectbox(
-    "Requested Payment Terms",
-    ["7 Days Direct Debit", "14 Days DD", "14 Days BACS", "28 Days BACS"],
-    index=0
-)
-contract_value = st.number_input("Total Contract Value (£)", 0.0)
-annual_volume = st.number_input("Estimated Annual Volume (kWh)", 0.0)
-contract_term = st.number_input("Contract Term (Years)", 1, 200)
-number_of_sites = st.number_input("Number of Sites", 1, 200)
+# --- Business Information ---
+st.header("1️⃣ Business Information")
+business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company"])
+number_of_sites = st.number_input("Number of Sites", 1)
+annual_volume_kwh = st.number_input("Estimated Annual Volume (kWh)", 0.0)
+contract_value = st.number_input("Total Contract Spend (£)", 0.0)
+contract_term = st.number_input("Contract Term (Years)", 1, 10)
+unit_margin_ppkwh = st.number_input("Proposed Unit Margin (p/kWh)", 0.0)
+broker_uplift_standing = st.number_input("Broker Uplift - Standing Charge (p/day)", 0.0)
+broker_uplift_unit_rate = st.number_input("Broker Uplift - Unit Rate (p/kWh)", 0.0)
 
-st.header("2️⃣ Pricing Details")
-unit_margin = st.number_input("Unit Margin (p/kWh)", 0.0)
-uplift_standing = st.number_input("Broker Uplift - Standing Charge (p/day)", 0.0)
-uplift_unit = st.number_input("Broker Uplift - Unit Rate (p/kWh)", 0.0)
-
-st.header("3️⃣ SIC Code")
-sic_code = st.text_input("Enter SIC Code").strip()
-sic_description, sic_risk = "Unknown", "Medium"
+st.header("2️⃣ SIC Code Information")
+sic_code = st.text_input("SIC Code (5-digit)").strip()
+sic_risk = "Medium"
+sic_description = "Unknown"
 
 if sic_code:
-    match = sic_df[sic_df['SIC_Code'] == sic_code]
-    if not match.empty:
-        sic_description = match.iloc[0]['SIC_Description']
-        sic_risk = match.iloc[0]['Typical_Risk_Rating']
+    matched = sic_df[sic_df['SIC_Code'] == sic_code]
+    if not matched.empty:
+        sic_description = matched.iloc[0]['SIC_Description']
+        sic_risk = matched.iloc[0]['Typical_Risk_Rating']
         st.markdown(f"**SIC Description:** {sic_description}")
-        st.markdown(f"**Risk Rating:** {sic_risk}")
+        st.markdown(f"**Typical Risk Rating:** {sic_risk}")
     else:
-        sic_risk = st.selectbox("Manual Risk Rating", ["Low", "Medium", "High", "Very High"], index=1)
+        st.warning("SIC Code not found. Please manually select risk.")
+        sic_risk = st.selectbox("Manual Sector Risk", ["Low", "Medium", "High", "Very High"], index=1)
 
-# --- Approver Logic ---
-def get_required_approver(sites, spend, volume):
-    if sites <= 20 and spend <= 50000 and volume <= 200000:
-        return "Sales Admin"
-    if sites <= 50 and spend <= 100000 and volume <= 400000:
-        return "TPI/ Direct Sales Manager"
-    if sites <= 75 and spend <= 250000 and volume <= 1000000:
-        return "Commercial Manager"
-    return "Managing Director"
+st.header("3️⃣ Credit Information")
+credit_score = st.number_input("Creditsafe Score", 0, 100)
+years_trading = st.number_input("Years Trading", 0)
+ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
+payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
 
-# --- Decision Engine (core logic preserved) ---
+# --- Decision Logic ---
 def run_decision():
     reasons = []
     decision = "Approved"
-    approver = None
-    three_month_exposure = contract_value / contract_term / 4
 
-    # Declines
-    if creditsafe_score < 30 and smet_compatible == "No":
+    if credit_score < config['refer_threshold']:
         decision = "Declined"
-        reasons.append("Declined: Credit score below 30 and meter not SMET-compatible.")
-    if has_ccjs == "Yes":
+        reasons.append("Declined: Credit Score below referral threshold")
+    if ccjs == "Yes":
         decision = "Declined"
-        reasons.append("Declined: CCJs/defaults present.")
-    if three_month_exposure > recommended_limit:
-        decision = "Declined"
-        reasons.append("Declined: 3-month exposure exceeds recommended limit.")
+        reasons.append("Declined: CCJs or Defaults present")
 
-    # Yu Energy message (text-only; does not override decision block here)
-    if creditsafe_score < 30 and smet_compatible == "Yes":
-        reasons.append("Credit Score below Dyce minimum - price with YU Energy only")
-
-    # Referral checks (only if not Declined)
     if decision != "Declined":
-        if creditsafe_score < 60:
-            reasons.append("Referral: Low credit score.")
+        if config['refer_threshold'] <= credit_score < config['approve_threshold']:
+            reasons.append("Referral: Credit Score between thresholds")
+
+        if (business_type in ["Sole Trader", "Partnership"] and years_trading < 1) or (business_type == "Limited Company" and years_trading < 2):
+            reasons.append("Referral: Insufficient trading history")
+
         if sic_risk in ["High", "Very High"]:
-            reasons.append("Referral: High sector risk.")
-        if payment_terms != "7 Days Direct Debit":
-            reasons.append("Referral: Non-standard payment terms.")
-        if unit_margin < 0.5:
-            reasons.append("Referral: Unit margin below minimum.")
-        if uplift_standing > 5.0:
-            reasons.append("Referral: Standing uplift too high.")
-        if uplift_unit > 1.0:
-            reasons.append("Referral: Unit rate uplift too high.")
-        if years_trading < 1:
-            reasons.append("Referral: Insufficient trading history.")
+            reasons.append("Referral: SIC Risk is High/Very High")
 
-        approver = get_required_approver(number_of_sites, contract_value, annual_volume)
+        if payment_terms != "14 Days Direct Debit":
+            reasons.append("Referral: Payment terms exceed maximum allowed")
 
-    # If the final decision is Approved, hide "Referral:" reasons on screen
-    if decision == "Approved":
-        reasons = [r for r in reasons if not r.startswith("Referral:")]
+        if unit_margin_ppkwh < config['minimum_unit_margin_ppkwh']:
+            reasons.append("Referral: Unit Margin below minimum")
 
-    return decision, (approver if decision != "Declined" else None), reasons
+        if broker_uplift_standing > config['max_broker_uplift_standing']:
+            reasons.append("Referral: Standing charge uplift exceeds maximum")
+
+        if broker_uplift_unit_rate > config['max_broker_uplift_unit_rate']:
+            reasons.append("Referral: Unit rate uplift exceeds maximum")
+
+    if decision == "Declined":
+        required_approver = None
+    else:
+        required_approver = "Managing Director"
+        for _, row in approval_matrix_df.iterrows():
+            if (number_of_sites <= row['Max Sites'] and
+                contract_value <= row['Max Spend'] and
+                annual_volume_kwh <= row['Max Volume (kWh)']):
+                required_approver = row['Role']
+                break
+
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return decision, required_approver, reasons, timestamp
 
 # --- PDF Export ---
 class PDF(FPDF):
     def header(self):
         self.image(LOGO_PATH, x=10, y=8, w=50)
         self.ln(35)
+
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
         self.set_text_color(15, 42, 52)
         self.cell(0, 10, f'Report generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 0, 0, 'C')
 
-def export_pdf(data, decision, approver, reasons):
+def export_to_pdf(inputs, decision, approver, reasons, timestamp):
     pdf = PDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 14)
+    pdf.set_font('Arial', 'B', 14)
     pdf.set_text_color(15, 42, 52)
-    pdf.cell(0, 10, "Dyce Credit Decision Report", ln=True)
+    pdf.cell(0, 10, 'Dyce Credit Decision Report', ln=True, align='C')
+    pdf.ln(10)
 
-    # Username, Company Name, Date
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 10, f"Username: {username}", ln=True)
-    pdf.cell(0, 10, f"Company Name: {company_name}", ln=True)
-    pdf.cell(0, 10, f"Date: {datetime.now().strftime('%d %B %Y')}", ln=True)
-
-    pdf.ln(5)
-    for k, v in data.items():
-        if "£" in k:
-            pdf.cell(0, 10, f"{k}: £{v:,.2f}", ln=True)
-        else:
-            pdf.cell(0, 10, f"{k}: {v}", ln=True)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, 'Inputs Summary:', ln=True)
+    pdf.set_font('Arial', '', 12)
+    for k, v in inputs.items():
+        pdf.multi_cell(0, 10, f"{k}: {v}")
 
     pdf.ln(5)
-    pdf.cell(0, 10, f"Decision: {decision}", ln=True)
-    if approver:
-        pdf.cell(0, 10, f"Approver Required: {approver}", ln=True)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, 'Decision:', ln=True)
+    pdf.set_font('Arial', '', 12)
+    pdf.multi_cell(0, 10, f"Decision: {decision}\nApprover Required: {approver if approver else 'N/A'}\nTimestamp: {timestamp}")
 
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "Reasons / Stipulations:", ln=True)
-    pdf.set_font("Arial", '', 12)
-    for r in reasons:
-        pdf.multi_cell(0, 10, f"- {r}")
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, 'Reasons / Stipulations:', ln=True)
+    pdf.set_font('Arial', '', 12)
+    for reason in reasons:
+        pdf.multi_cell(0, 10, f"- {reason}")
 
-    buffer = BytesIO()
     pdf_bytes = pdf.output(dest='S').encode('latin1')
-    buffer.write(pdf_bytes)
-    buffer.seek(0)
-    return buffer
+    return BytesIO(pdf_bytes)
 
-# --- Run Decision ---
 if st.button("Run Decision Engine"):
-    decision, approver, reasons = run_decision()
-    st.subheader("Decision Result")
-    st.markdown(f"**Final Decision:** {decision}")
-    if approver:
-        st.markdown(f"**Required Approver:** {approver}")
-        if approver == "Managing Director":
-            st.markdown("📧 Please email the PDF report to **Tenderapprovals@dyce-energy.co.uk**")
-
-    for r in reasons:
-        st.markdown(f"- {r}")
-
-    result_data = {
-        "Company Name": company_name,
-        "Creditsafe Score": creditsafe_score,
-        "Creditsafe Recommended Limit (£)": recommended_limit,
-        "Total Contract Value (£)": contract_value,
-        "Estimated Annual Volume (kWh)": annual_volume,
-        "Number of Sites": number_of_sites,
-        "SIC Code": sic_code,
-        "SIC Description": sic_description,
-        "Risk Rating": sic_risk
+    inputs = {
+        'Business Type': business_type,
+        'Number of Sites': number_of_sites,
+        'Annual Volume': annual_volume_kwh,
+        'Contract Value': contract_value,
+        'Contract Term': contract_term,
+        'Unit Margin': unit_margin_ppkwh,
+        'Broker Uplift Standing': broker_uplift_standing,
+        'Broker Uplift Unit Rate': broker_uplift_unit_rate,
+        'SIC Code': sic_code,
+        'SIC Description': sic_description,
+        'SIC Risk': sic_risk,
+        'Credit Score': credit_score,
+        'Years Trading': years_trading,
+        'CCJs': ccjs,
+        'Payment Terms': payment_terms
     }
 
-    pdf_file = export_pdf(result_data, decision, approver, reasons)
-    st.download_button("Download PDF Report", pdf_file, "Credit_Decision_Report.pdf", "application/pdf")
+    final_decision, required_approver, reasons, timestamp = run_decision()
+
+    st.subheader("Decision Results")
+    st.write(f"**Final Decision:** {final_decision}")
+    if required_approver:
+        st.write(f"**Required Approver:** {required_approver}")
+    st.write(f"**Timestamp:** {timestamp}")
+
+    st.markdown("**Reasons / Stipulations:**")
+    for reason in reasons:
+        st.markdown(f"- {reason}")
+
+    pdf_data = export_to_pdf(inputs, final_decision, required_approver, reasons, timestamp)
+    st.download_button("Download PDF Report", pdf_data, "Credit_Decision_Report.pdf", "application/pdf")
