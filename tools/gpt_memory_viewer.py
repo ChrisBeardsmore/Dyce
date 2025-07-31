@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
-from shared.sqlite_utils import get_connection, get_memory, log_gpt_note
+from sqlite_test_patch import get_connection, get_memory, log_gpt_note
 
 st.set_page_config(page_title="GPT Memory Viewer", layout="centered")
 st.title("🧠 GPT Memory Log")
