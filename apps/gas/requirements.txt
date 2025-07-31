@@ -1,0 +1,7 @@
+pandas
+numpy
+xlsxwriter
+streamlit
+openpyxl
+fpdf
+streamlit-aggrid
