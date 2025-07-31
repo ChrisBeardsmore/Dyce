@@ -1,0 +1,10 @@
+# requirements-dev.txt
+# Combine all core libraries across apps + dev tools
+-e apps/contract
+-e apps/gas
+-e apps/power
+-e apps/directgas
+-e apps/directpower
+black
+flake8
+pytest
