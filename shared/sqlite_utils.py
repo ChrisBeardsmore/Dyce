@@ -77,3 +77,9 @@ log_gpt_memory(conn, app="gas", message="Updated margin logic in gpricebook.py")
 logs = get_memory(conn, app="gas")
 for row in logs:
     print(row)
+
+def log_gpt_note(app, message):
+    conn = get_connection()
+    create_memory_table(conn)
+    log_gpt_memory(conn, app=app, message=message, user="GPT")
+
