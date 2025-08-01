@@ -5,3 +5,4 @@ streamlit
 openpyxl
 fpdf
 streamlit-aggrid
+pillow
