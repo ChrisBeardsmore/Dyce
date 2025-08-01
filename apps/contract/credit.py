@@ -6,9 +6,8 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Dyce Contract Decision Engine V2", layout="wide")
 
-VERSION = "2.0 - July 2025"
+VERSION = "2.1 - August 2025"
 LOGO_PATH = "shared/DYCE-DARK BG.png"
-
 CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx"
 SIC_CODES_URL = "inputs/Sic Codes.xlsx"
 
@@ -23,33 +22,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image(LOGO_PATH, width=200)
-
 st.title(f"⚡ Dyce Contract Decision Engine (v{VERSION})")
 
 @st.cache_data
 def load_config():
     config_df = pd.read_excel(CONFIG_URL, sheet_name='CreditCriteria')
     approval_df = pd.read_excel(CONFIG_URL, sheet_name='ApprovalMatrix')
-
-    # Build config dictionary (ensure keys are strings, values are numeric where needed)
-    config = dict(zip(config_df['Parameter'], config_df['Value']))
-
-    # Clean approval_df
-    approval_df['Max Annual Spend'] = (
-        approval_df['Max Annual Spend']
-        .astype(str)
-        .str.replace("£", "", regex=False)
-        .str.replace(",", "", regex=False)
-        .astype(float)
-    )
+    config_df = config_df.set_index('Parameter').apply(pd.to_numeric, errors='coerce')
+    config = config_df.T.to_dict('records')[0]
+    approval_df.columns = approval_df.columns.str.strip()
+    approval_df = approval_df.dropna()
     approval_df['Max Sites'] = approval_df['Max Sites'].astype(int)
-    approval_df['Max Annual Volume (kWh)'] = (
-        approval_df['Max Annual Volume (kWh)']
-        .astype(str)
-        .str.replace(",", "", regex=False)
-        .astype(float)
-    )
-
+    approval_df['Min Annual Spend'] = approval_df['Min Annual Spend'].replace('[^\d.]', '', regex=True).astype(float)
+    approval_df['Max Annual Spend'] = approval_df['Max Annual Spend'].replace('[^\d.]', '', regex=True).astype(float)
+    approval_df['Min Annual Volume (kWh)'] = approval_df['Min Annual Volume (kWh)'].astype(float)
+    approval_df['Max Annual Volume (kWh)'] = approval_df['Max Annual Volume (kWh)'].astype(float)
     return config, approval_df
 
 @st.cache_data
@@ -92,13 +79,13 @@ st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
 ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
-payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
+payment_terms = st.selectbox("Requested Payment Terms (days)", [7, 14, 28])
 
+# --- Decision Logic ---
 def run_decision():
     reasons = []
     decision = "Approved"
 
-    # Decline if credit too low or CCJs present
     if credit_score < config['refer_threshold']:
         decision = "Declined"
         reasons.append("Declined: Credit Score below referral threshold")
@@ -106,7 +93,6 @@ def run_decision():
         decision = "Declined"
         reasons.append("Declined: CCJs or Defaults present")
 
-    # Referral rules (if not declined)
     if decision != "Declined":
         if config['refer_threshold'] <= credit_score < config['approve_threshold']:
             reasons.append("Referral: Credit Score between thresholds")
@@ -118,8 +104,8 @@ def run_decision():
         if sic_risk in ["High", "Very High"]:
             reasons.append("Referral: SIC Risk is High/Very High")
 
-        if payment_terms != "14 Days Direct Debit":
-            reasons.append("Referral: Payment terms exceed maximum allowed")
+        if payment_terms > config['Requested_Payment_Terms']:
+            reasons.append("Referral: Payment terms exceed allowed maximum")
 
         if unit_margin_ppkwh < config['minimum_unit_margin_ppkwh']:
             reasons.append("Referral: Unit Margin below minimum")
@@ -130,17 +116,16 @@ def run_decision():
         if broker_uplift_unit_rate > config['max_broker_uplift_unit_rate']:
             reasons.append("Referral: Unit rate uplift exceeds maximum")
 
-    # Approval assignment
-    if decision == "Declined":
-        required_approver = None
-    else:
-        required_approver = "Managing Director"  # Default
+    required_approver = None
+    if decision != "Declined":
         for _, row in approval_matrix_df.iterrows():
             if (number_of_sites <= row['Max Sites'] and
-                contract_value <= row['Max Annual Spend'] and
-                annual_volume_kwh <= row['Max Annual Volume (kWh)']):
+                row['Min Annual Spend'] <= contract_value <= row['Max Annual Spend'] and
+                row['Min Annual Volume (kWh)'] <= annual_volume_kwh <= row['Max Annual Volume (kWh)']):
                 required_approver = row['Role']
                 break
+        else:
+            required_approver = "Managing Director"
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return decision, required_approver, reasons, timestamp
