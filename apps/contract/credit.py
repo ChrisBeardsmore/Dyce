@@ -46,13 +46,17 @@ def load_config():
 
     approval_df['Max Sites'] = approval_df['Max Sites'].astype(int)
     cols_to_clean = [
-        'Min Annual Spend', 'Max Annual Spend',
-        'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
-    ]
-    for col in cols_to_clean:
-        approval_df[col] = (
-            approval_df[col].astype(str).str.replace(r'[^\d.]', '', regex=True).astype(float)
-        )
+    'Min sites', 'Max Sites',
+    'Min Annual Spend', 'Max Annual Apend',
+    'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
+]
+for col in cols_to_clean:
+    approval_df[col] = (
+        approval_df[col]
+        .astype(str)
+        .str.replace('[^\\d.]', '', regex=True)
+        .astype(float)
+    )
 
     return config, approval_df
 
