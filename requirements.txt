@@ -1,16 +1,14 @@
 # requirements-dev.txt
-# Combine all core libraries across apps + dev tools
+# Core libraries used across apps
 pandas
 numpy
 xlsxwriter
 streamlit
 openpyxl
 fpdf
-apps/gas
-apps/power
-apps/directgas
-apps/directpower
-apps/contract
+streamlit-aggrid
+
+# Dev tools
 black
 flake8
 pytest
