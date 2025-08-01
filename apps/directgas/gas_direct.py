@@ -1,4 +1,4 @@
-# Gas Direct Final (V6.0)
+# Gas Direct Final (V6.1)
 # -----------------------------------------------------------------------------
 # ✅ Unified Input Grid (Editable + Base Rates + TAC + Margin)
 # ✅ Postcode -> LDZ mapping
@@ -78,28 +78,7 @@ if uploaded_file:
             f"TAC £({d}m)", f"Margin £({d}m)"
         ]
 
-    prefill_rows = []
-    for _ in range(10):
-        row_data = {col: "" if col in ["Site Name", "Post Code"] else 0 for col in all_cols}
-        postcode = row_data.get("Post Code", "")
-        kwh = row_data.get("Annual KWH", 0)
-        ldz = match_postcode_to_ldz(postcode, ldz_df) if postcode else ""
-
-        for d in durations:
-            match = flat_df[
-                (flat_df["LDZ"] == ldz) &
-                (flat_df["Contract_Duration"] == d) &
-                (flat_df["Minimum_Annual_Consumption"] <= kwh) &
-                (flat_df["Maximum_Annual_Consumption"] >= kwh) &
-                (flat_df["Carbon_Offset"] == carbon_offset_required)
-            ]
-            if not match.empty:
-                t = match.sort_values("Unit_Rate").iloc[0]
-                row_data[f"Base Unit Rate ({d}m)"] = round(t["Unit_Rate"], 3)
-                row_data[f"Base Standing Charge ({d}m)"] = round(t["Standing_Charge"], 2)
-        prefill_rows.append(row_data)
-
-    input_df = pd.DataFrame(prefill_rows)
+    input_df = pd.DataFrame([{col: "" if col in ["Site Name", "Post Code"] else 0 for col in all_cols} for _ in range(10)])
 
     edited_df = st.data_editor(
         input_df,
@@ -118,11 +97,29 @@ if uploaded_file:
         if not postcode or kwh <= 0:
             continue
 
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
         row_data = {"Site Name": site, "Post Code": postcode, "Annual KWH": kwh}
 
         for duration in durations:
-            base_unit = float(row.get(f"Base Unit Rate ({duration}m)", 0))
-            base_sc = float(row.get(f"Base Standing Charge ({duration}m)", 0))
+            match = flat_df[
+                (flat_df["LDZ"] == ldz) &
+                (flat_df["Contract_Duration"] == duration) &
+                (flat_df["Minimum_Annual_Consumption"] <= kwh) &
+                (flat_df["Maximum_Annual_Consumption"] >= kwh) &
+                (flat_df["Carbon_Offset"] == carbon_offset_required)
+            ]
+
+            if not match.empty:
+                t = match.sort_values("Unit_Rate").iloc[0]
+                base_unit = t["Unit_Rate"]
+                base_sc = t["Standing_Charge"]
+            else:
+                base_unit = 0.0
+                base_sc = 0.0
+
+            row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+
             uplift_unit = min(float(row.get(f"Uplift Unit Rate ({duration}m)", 0)), 3.000)
             uplift_sc = min(float(row.get(f"Standing Charge Uplift ({duration}m)", 0)), 100.0)
 
@@ -132,8 +129,6 @@ if uploaded_file:
             sell_tac = round((sell_unit * kwh + sell_sc * 365) / 100, 2)
             margin = round(sell_tac - base_tac, 2)
 
-            row_data[f"Sell Standing Charge ({duration}m)"] = round(sell_sc, 2)
-            row_data[f"Sell Unit Rate ({duration}m)"] = round(sell_unit, 3)
             row_data[f"TAC £({duration}m)"] = sell_tac
             row_data[f"Margin £({duration}m)"] = margin
 
@@ -141,7 +136,7 @@ if uploaded_file:
 
     if result_rows:
         output_df = pd.DataFrame(result_rows)
-        output_cols = ["Site Name", "Post Code", "Annual KWH"] + [f"Sell Standing Charge ({d}m)" for d in durations] + [f"Sell Unit Rate ({d}m)" for d in durations] + [f"TAC £({d}m)" for d in durations] + [f"Margin £({d}m)" for d in durations]
+        output_cols = ["Site Name", "Post Code", "Annual KWH"] + [f"TAC £({d}m)" for d in durations]
         st.dataframe(output_df[output_cols], use_container_width=True, height=400)
 
         st.subheader("Summary Totals")
