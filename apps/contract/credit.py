@@ -58,7 +58,7 @@ for col in cols_to_clean:
         .astype(float)
     )
 
-    return config, approval_df
+return config, approval_df
 
 @st.cache_data
 def load_sic_codes():
