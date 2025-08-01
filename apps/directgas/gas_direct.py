@@ -17,6 +17,22 @@ import io
 from PIL import Image
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
+st.markdown("""
+    <style>
+        .st-emotion-cache-1c7y2kd {
+            background-color: #f8f8f8 !important;
+            border: 1px solid #ccc !important;
+            color: #0F2A34 !important;
+        }
+        .st-emotion-cache-1c7y2kd:hover {
+            border-color: #DE0089 !important;
+        }
+        .st-emotion-cache-1c7y2kd svg {
+            color: #DE0089 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Gas Multi-site Quote Builder – Final Version")
 
 # Load logo (top-right)
