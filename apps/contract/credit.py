@@ -30,7 +30,26 @@ st.title(f"⚡ Dyce Contract Decision Engine (v{VERSION})")
 def load_config():
     config_df = pd.read_excel(CONFIG_URL, sheet_name='CreditCriteria')
     approval_df = pd.read_excel(CONFIG_URL, sheet_name='ApprovalMatrix')
+
+    # Build config dictionary (ensure keys are strings, values are numeric where needed)
     config = dict(zip(config_df['Parameter'], config_df['Value']))
+
+    # Clean approval_df
+    approval_df['Max Annual Spend'] = (
+        approval_df['Max Annual Spend']
+        .astype(str)
+        .str.replace("£", "", regex=False)
+        .str.replace(",", "", regex=False)
+        .astype(float)
+    )
+    approval_df['Max Sites'] = approval_df['Max Sites'].astype(int)
+    approval_df['Max Annual Volume (kWh)'] = (
+        approval_df['Max Annual Volume (kWh)']
+        .astype(str)
+        .str.replace(",", "", regex=False)
+        .astype(float)
+    )
+
     return config, approval_df
 
 @st.cache_data
@@ -75,11 +94,11 @@ years_trading = st.number_input("Years Trading", 0)
 ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
 payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
 
-# --- Decision Logic ---
 def run_decision():
     reasons = []
     decision = "Approved"
 
+    # Decline if credit too low or CCJs present
     if credit_score < config['refer_threshold']:
         decision = "Declined"
         reasons.append("Declined: Credit Score below referral threshold")
@@ -87,11 +106,13 @@ def run_decision():
         decision = "Declined"
         reasons.append("Declined: CCJs or Defaults present")
 
+    # Referral rules (if not declined)
     if decision != "Declined":
         if config['refer_threshold'] <= credit_score < config['approve_threshold']:
             reasons.append("Referral: Credit Score between thresholds")
 
-        if (business_type in ["Sole Trader", "Partnership"] and years_trading < 1) or (business_type == "Limited Company" and years_trading < 2):
+        if (business_type in ["Sole Trader", "Partnership"] and years_trading < 1) or \
+           (business_type == "Limited Company" and years_trading < 2):
             reasons.append("Referral: Insufficient trading history")
 
         if sic_risk in ["High", "Very High"]:
@@ -109,14 +130,15 @@ def run_decision():
         if broker_uplift_unit_rate > config['max_broker_uplift_unit_rate']:
             reasons.append("Referral: Unit rate uplift exceeds maximum")
 
+    # Approval assignment
     if decision == "Declined":
         required_approver = None
     else:
-        required_approver = "Managing Director"
+        required_approver = "Managing Director"  # Default
         for _, row in approval_matrix_df.iterrows():
             if (number_of_sites <= row['Max Sites'] and
-                contract_value <= row['Max Spend'] and
-                annual_volume_kwh <= row['Max Volume (kWh)']):
+                contract_value <= row['Max Annual Spend'] and
+                annual_volume_kwh <= row['Max Annual Volume (kWh)']):
                 required_approver = row['Role']
                 break
 
