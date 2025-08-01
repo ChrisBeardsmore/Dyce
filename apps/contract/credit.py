@@ -7,7 +7,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Dyce Contract Decision Engine V2", layout="wide")
 
 VERSION = "2.0 - July 2025"
-LOGO_PATH = "DYCE-DARK BG.png"
+LOGO_PATH = "shared/DYCE-DARK BG.png
 
 CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx"
 SIC_CODES_URL = "inputs/Sic Codes.xlsx"
