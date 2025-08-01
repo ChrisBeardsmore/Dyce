@@ -6,7 +6,6 @@ xlsxwriter
 streamlit
 openpyxl
 fpdf
-streamlit-aggrid-e apps/contract
 -e apps/gas
 -e apps/power
 -e apps/directgas
