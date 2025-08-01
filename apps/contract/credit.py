@@ -41,24 +41,25 @@ def load_config():
         row['Parameter']: {
             'min': float(row['Min Value']),
             'max': float(row['Max Value'])
-        } for _, row in config_df.iterrows()
+        }
+        for _, row in config_df.iterrows()
     }
 
-    approval_df['Max Sites'] = approval_df['Max Sites'].astype(int)
-    cols_to_clean = [
-    'Min sites', 'Max Sites',
-    'Min Annual Spend', 'Max Annual Apend',
-    'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
-]
-for col in cols_to_clean:
-    approval_df[col] = (
-        approval_df[col]
-        .astype(str)
-        .str.replace('[^\\d.]', '', regex=True)
-        .astype(float)
-    )
+    numeric_columns = [
+        'Min sites', 'Max Sites',
+        'Min Annual Spend', 'Max Annual Apend',
+        'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
+    ]
 
-return config, approval_df
+    for col in numeric_columns:
+        approval_df[col] = (
+            approval_df[col]
+            .astype(str)
+            .str.replace('[^\\d.]', '', regex=True)
+            .astype(float)
+        )
+
+    return config, approval_df
 
 @st.cache_data
 def load_sic_codes():
