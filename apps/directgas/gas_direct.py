@@ -17,22 +17,6 @@ import io
 from PIL import Image
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
-st.markdown("""
-    <style>
-        .st-emotion-cache-1c7y2kd {
-            background-color: #f8f8f8 !important;
-            border: 1px solid #ccc !important;
-            color: #0F2A34 !important;
-        }
-        .st-emotion-cache-1c7y2kd:hover {
-            border-color: #DE0089 !important;
-        }
-        .st-emotion-cache-1c7y2kd svg {
-            color: #DE0089 !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("Gas Multi-site Quote Builder – Final Version")
 
 # Load logo (top-right)
@@ -95,7 +79,34 @@ if uploaded_file:
             f"TAC £({d}m)", f"Margin £({d}m)"
         ]
 
-    input_df = pd.DataFrame([{col: "" if col in ["Site Name", "Post Code"] else 0 for col in all_cols} for _ in range(10)])
+    # Prepopulate input grid with base prices
+    input_rows = []
+    for _ in range(10):
+        row_data = {col: "" if col in ["Site Name", "Post Code"] else 0 for col in all_cols}
+        input_rows.append(row_data)
+
+    input_df = pd.DataFrame(input_rows)
+
+    # Apply base rates before editing
+    for idx, row in input_df.iterrows():
+        postcode = row["Post Code"]
+        kwh = row["Annual KWH"]
+        if not postcode or kwh <= 0:
+            continue
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+
+        for duration in durations:
+            match = flat_df[
+                (flat_df["LDZ"] == ldz) &
+                (flat_df["Contract_Duration"] == duration) &
+                (flat_df["Minimum_Annual_Consumption"] <= kwh) &
+                (flat_df["Maximum_Annual_Consumption"] >= kwh) &
+                (flat_df["Carbon_Offset"] == carbon_offset_required)
+            ]
+            if not match.empty:
+                t = match.sort_values("Unit_Rate").iloc[0]
+                input_df.at[idx, f"Base Standing Charge ({duration}m)"] = round(t["Standing_Charge"], 2)
+                input_df.at[idx, f"Base Unit Rate ({duration}m)"] = round(t["Unit_Rate"], 3)
 
     edited_df = st.data_editor(
         input_df,
@@ -114,41 +125,25 @@ if uploaded_file:
         if not postcode or kwh <= 0:
             continue
 
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
         row_data = {"Site Name": site, "Post Code": postcode, "Annual KWH": kwh}
 
         for duration in durations:
-            uplift_unit = min(float(row.get(f"Uplift Unit Rate ({duration}m)", 0)), 3.000)
+            base_sc = float(row.get(f"Base Standing Charge ({duration}m)", 0))
+            base_unit = float(row.get(f"Base Unit Rate ({duration}m)", 0))
             uplift_sc = min(float(row.get(f"Standing Charge Uplift ({duration}m)", 0)), 100.0)
+            uplift_unit = min(float(row.get(f"Uplift Unit Rate ({duration}m)", 0)), 3.000)
 
-            match = flat_df[
-                (flat_df["LDZ"] == ldz) &
-                (flat_df["Contract_Duration"] == duration) &
-                (flat_df["Minimum_Annual_Consumption"] <= kwh) &
-                (flat_df["Maximum_Annual_Consumption"] >= kwh) &
-                (flat_df["Carbon_Offset"] == carbon_offset_required)
-            ]
-
-            if not match.empty:
-                t = match.sort_values("Unit_Rate").iloc[0]
-                base_unit = t["Unit_Rate"]
-                base_sc = t["Standing_Charge"]
-            else:
-                base_unit = 0.0
-                base_sc = 0.0
-
-            sell_unit = base_unit + uplift_unit
             sell_sc = base_sc + uplift_sc
+            sell_unit = base_unit + uplift_unit
+
             base_tac = round((base_unit * kwh + base_sc * 365) / 100, 2)
             sell_tac = round((sell_unit * kwh + sell_sc * 365) / 100, 2)
             margin = round(sell_tac - base_tac, 2)
 
-            row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-            row_data[f"TAC £({duration}m)"] = sell_tac
-            row_data[f"Margin £({duration}m)"] = margin
             row_data[f"Sell Standing Charge ({duration}m)"] = round(sell_sc, 2)
             row_data[f"Sell Unit Rate ({duration}m)"] = round(sell_unit, 3)
+            row_data[f"TAC £({duration}m)"] = sell_tac
+            row_data[f"Margin £({duration}m)"] = margin
 
         result_rows.append(row_data)
 
