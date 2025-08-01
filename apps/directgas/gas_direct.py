@@ -72,12 +72,12 @@ if uploaded_file:
         ]
 
     default_row = {col: "" if "Site" in col or "Post" in col else 0 for col in input_cols}
-    input_df = pd.DataFrame([default_row.copy() for _ in range(10)])
+    input_df = pd.DataFrame([{...} for _ in range(5)])
 
     edited_df = st.data_editor(
         input_df,
         use_container_width=True,
-        num_rows="fixed",
+        num_rows="dynamic",
         hide_index=True,
         key="final_v6_input"
     )
