@@ -23,7 +23,7 @@ st.title("Gas Multi-site Quote Builder – Final Version")
 col1, col2 = st.columns([9, 1])
 with col2:
     try:
-        logo = Image.open("DYCE-DARK BG.png")
+        logo = Image.open("shared/DYCE-DARK BG.png")
         st.image(logo, width=120)
     except:
         st.warning("⚠️ Logo not found")
