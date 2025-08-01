@@ -6,10 +6,11 @@ xlsxwriter
 streamlit
 openpyxl
 fpdf
--e apps/gas
--e apps/power
--e apps/directgas
--e apps/directpower
+apps/gas
+apps/power
+apps/directgas
+apps/directpower
+apps/contract
 black
 flake8
 pytest
