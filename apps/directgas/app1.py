@@ -7,7 +7,7 @@ from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 from apps.directgas.logic.base_price_lookup import get_base_rates
 from apps.directgas.logic.tac_calculator import calculate_tac_and_margin
 from apps.directgas.logic.flat_file_loader import load_flat_file
-
+from apps.directgas.logic.input_setup import create_input_dataframe
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
@@ -46,7 +46,7 @@ if uploaded_file:
             f"TAC £({d}m)", f"Margin £({d}m)"
         ]
 
-    input_df = pd.DataFrame([{col: "" if col in ["Site Name", "Post Code"] else 0 for col in all_cols} for _ in range(10)])
+
 
     edited_df = st.data_editor(
         input_df,
