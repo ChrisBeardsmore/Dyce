@@ -157,6 +157,46 @@ if uploaded_file:
         result_rows.append(row_data)
 
     # 🔴 -----------------------------------------
+    # 🔴 Step 5C: Calculate TAC & Margin Values
+    # 🔴 -----------------------------------------
+
+    st.subheader("Customer-Facing Output Preview")
+    result_rows = []
+
+    for _, row in edited_df.iterrows():
+        site = row.get("Site Name", "").strip()
+        postcode = row.get("Post Code", "").strip()
+        try:
+            kwh = float(row.get("Annual KWH", 0))
+        except (ValueError, TypeError):
+            continue
+
+        if not postcode or kwh <= 0:
+            continue
+
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+
+        row_data = {
+            "Site Name": site,
+            "Post Code": postcode,
+            "Annual KWH": kwh
+        }
+
+        for duration in durations:
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
+            uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
+
+            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+
+            row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+            row_data[f"TAC £({duration}m)"] = sell_tac
+            row_data[f"Margin £({duration}m)"] = margin
+
+        result_rows.append(row_data)
+
+    # 🔴 -----------------------------------------
     # 🔴 Step 6: Display Output Table
     # 🔴 -----------------------------------------
     if result_rows:
