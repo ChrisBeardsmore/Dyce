@@ -1,33 +1,29 @@
-# 🔴 -----------------------------------------
-# 🔴 File: app_test.py
-# 🔴 Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
-# 🔴 Dependencies: logic modules from /apps/directgas/logic/
-# 🔴 -----------------------------------------
+# ⬤ -----------------------------------------
+# ⬤ File: app_test.py
+# ⬤ Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
+# ⬤ Dependencies: logic modules from /apps/directgas/logic/
+# ⬤ -----------------------------------------
 
 import sys
 import os
 
-# 🔴 Fix: Add /apps to the Python path so we can import directgas as a top-level module
+# ⬤ Fix: Add /apps to the Python path so we can import directgas as a top-level module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
 
 import streamlit as st
 import pandas as pd
 from PIL import Image
 
-# 🔴 Import core logic modules
+# ⬤ Import core logic modules
 from directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 from directgas.logic.base_rate_lookup import get_base_rates
 from directgas.logic.tac_calculator import calculate_tac_and_margin
 from directgas.logic.flat_file_loader import load_flat_file
 from directgas.logic.input_setup import create_input_dataframe
 
-# 🔴 -----------------------------------------
-# 🔴 UI Setup: Page settings and branding
-# 🔴 -----------------------------------------
-
-st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
-st.title("Gas Multi-site Quote Builder – Final Version")
-
+# ⬤ -----------------------------------------
+# ⬤ UI Setup: Page settings and branding
+# ⬤ -----------------------------------------
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
@@ -41,130 +37,91 @@ with col2:
     except FileNotFoundError:
         st.warning("⚠️ Logo not found")
 
-# 🔴 -----------------------------------------
-# 🔴 Step 1: Load LDZ reference data
-# 🔴 -----------------------------------------
+# ⬤ -----------------------------------------
+# ⬤ Step 1: Load LDZ reference data
+# ⬤ -----------------------------------------
 ldz_df = load_ldz_data()
 
-# 🔴 -----------------------------------------
-# 🔴 Step 2: Upload Supplier Flat File
-# 🔴 -----------------------------------------
+# ⬤ -----------------------------------------
+# ⬤ Step 2: Upload Supplier Flat File
+# ⬤ -----------------------------------------
 uploaded_file = st.file_uploader("Upload Supplier Flat File (XLSX)", type=["xlsx"])
 
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
 
-    # 🔴 -----------------------------------------
-    # 🔴 Step 3: Quote Configuration Inputs
-    # 🔴 -----------------------------------------
+    # ⬤ -----------------------------------------
+    # ⬤ Step 3: Quote Configuration Inputs
+    # ⬤ -----------------------------------------
     st.subheader("Quote Configuration")
     customer_name = st.text_input("Customer Name")
     product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
     carbon_offset_required = product_type == "Carbon Off"
     output_filename = st.text_input("Output file name", value="dyce_quote")
 
-    🔴 -----------------------------------------
-# 🔴 Step 3B: Add Sites via Input Form
-# 🔴 Purpose: Allow quick entry of multiple sites before showing full grid
-# 🔴 Notes:
-# 🔴   - Each submitted site is added as a new row
-# 🔴   - Fields: Site Name, Postcode, Annual KWH (optional MPAN support)
-# 🔴   - Replaces need to edit blank rows manually
-# 🔴 -----------------------------------------
+    # ⬤ -----------------------------------------
+    # ⬤ Step 3B: Add Sites via Input Form
+    # ⬤ -----------------------------------------
+    st.subheader("🔹 Add Sites to Quote")
 
-st.subheader("🔹 Add Sites to Quote")
+    if "input_df" not in st.session_state:
+        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
-# Create or recall session state for input_df
-if "input_df" not in st.session_state:
-    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+    with st.form("add_site_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_name = st.text_input("Site Name")
+            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+        with col2:
+            postcode = st.text_input("Post Code")
+            try:
+                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+            except ValueError:
+                consumption = 0.0
 
-with st.form("add_site_form", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        site_name = st.text_input("Site Name")
-        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-    with col2:
-        postcode = st.text_input("Post Code")
-        try:
-            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-        except ValueError:
-            consumption = 0.0
+        submitted = st.form_submit_button("➕ Add Site")
 
-    submitted = st.form_submit_button("➕ Add Site")
+    if submitted:
+        if site_name and postcode and consumption > 0:
+            new_row = {
+                "Site Name": site_name.strip(),
+                "Post Code": postcode.strip(),
+                "Annual KWH": consumption
+            }
+            for d in [12, 24, 36]:
+                new_row.update({
+                    f"Base Standing Charge ({d}m)": 0,
+                    f"Base Unit Rate ({d}m)": 0,
+                    f"Standing Charge Uplift ({d}m)": 0,
+                    f"Uplift Unit Rate ({d}m)": 0,
+                    f"TAC £({d}m)": 0,
+                    f"Margin £({d}m)": 0
+                })
 
-if submitted:
-    if site_name and postcode and consumption > 0:
-        new_row = {
-            "Site Name": site_name.strip(),
-            "Post Code": postcode.strip(),
-            "Annual KWH": consumption
-        }
+            st.session_state.input_df = pd.concat(
+                [st.session_state.input_df, pd.DataFrame([new_row])],
+                ignore_index=True
+            )
+        else:
+            st.warning("Please enter valid Site Name, Post Code, and KWH.")
 
-        # Add default 0s for pricing/uplift columns
-        for d in [12, 24, 36]:
-            new_row.update({
-                f"Base Standing Charge ({d}m)": 0,
-                f"Base Unit Rate ({d}m)": 0,
-                f"Standing Charge Uplift ({d}m)": 0,
-                f"Uplift Unit Rate ({d}m)": 0,
-                f"TAC £({d}m)": 0,
-                f"Margin £({d}m)": 0
-            })
-
-        # Add to session_state DataFrame
-        st.session_state.input_df = pd.concat(
-            [st.session_state.input_df, pd.DataFrame([new_row])],
-            ignore_index=True
-        )
-    else:
-        st.warning("Please enter valid Site Name, Post Code, and KWH.")
-
-🧠 What This Does:
-It tracks added sites via st.session_state.input_df
-
-Each new row is cleanly added to the input grid
-
-When you hit Step 4, you just display this full dataframe:
-
-python
-Copy
-Edit
-edited_df = st.data_editor(
-    st.session_state.input_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    hide_index=True,
-    disabled=[]
-)
-
-    # 🔴 -----------------------------------------
-    # 🔴 Step 4: Editable Input Grid Setup
-    # 🔴 -----------------------------------------
+    # ⬤ -----------------------------------------
+    # ⬤ Step 4: Editable Input Grid Setup
+    # ⬤ -----------------------------------------
     st.subheader("Input Grid (Editable)")
-    base_cols = ["Site Name", "Post Code", "Annual KWH"]
     durations = [12, 24, 36]
 
-    input_df, all_cols = create_input_dataframe(num_rows=10)
-
-    # Display editable grid to user
     edited_df = st.data_editor(
-        input_df,
+        st.session_state.input_df,
         use_container_width=True,
-        num_rows="fixed",
+        num_rows="dynamic",
         hide_index=True,
         disabled=[]
     )
 
-    # 🔴 -----------------------------------------
-    # 🔴 Step 5: Preview Output Table – TAC & Margin
-    # 🔴 -----------------------------------------
-    # 🔴 -----------------------------------------
-    # 🔴 Step 5B: Inject Base Rates Back into Editable Grid
-    # 🔴 Purpose: Ensure base rates (SC & Unit) show alongside user-entered data
-    # 🔴 Notes: This prevents “ghost” calculations and aligns user view with logic
-    # 🔴 -----------------------------------------
-
-    # Create a copy of the input for visible augmentation
+    # ⬤ -----------------------------------------
+    # ⬤ Step 5B: Inject Base Rates Back into Editable Grid
+    # ⬤ -----------------------------------------
     preview_df = edited_df.copy()
 
     for i, row in edited_df.iterrows():
@@ -184,56 +141,11 @@ edited_df = st.data_editor(
             preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
             preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
-    # Replace the editor with version containing base prices
     edited_df = preview_df
-    st.subheader("Customer-Facing Output Preview")
-    result_rows = []
 
-    for _, row in edited_df.iterrows():
-        site = row.get("Site Name", "")
-        postcode = row.get("Post Code", "")
-
-        try:
-            kwh = float(row.get("Annual KWH", 0))
-        except (ValueError, TypeError):
-            continue
-
-        if not postcode or kwh <= 0:
-            continue
-
-        # Match postcode → LDZ
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
-
-        # Prepare row for output
-        row_data = {
-            "Site Name": site,
-            "Post Code": postcode,
-            "Annual KWH": kwh
-        }
-
-        for duration in durations:
-            # Lookup base prices
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-
-            # Pull uplifts from user input
-            uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
-            uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
-
-            # Calculate TAC and margin
-            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-
-            # Append results
-            row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-            row_data[f"TAC £({duration}m)"] = sell_tac
-            row_data[f"Margin £({duration}m)"] = margin
-
-        result_rows.append(row_data)
-
-    # 🔴 -----------------------------------------
-    # 🔴 Step 5C: Calculate TAC & Margin Values
-    # 🔴 -----------------------------------------
-
+    # ⬤ -----------------------------------------
+    # ⬤ Step 5C: Calculate TAC & Margin Values
+    # ⬤ -----------------------------------------
     st.subheader("Customer-Facing Output Preview")
     result_rows = []
 
@@ -260,7 +172,6 @@ edited_df = st.data_editor(
             base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
             uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
             uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
-
             sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
 
             row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
@@ -270,9 +181,9 @@ edited_df = st.data_editor(
 
         result_rows.append(row_data)
 
-    # 🔴 -----------------------------------------
-    # 🔴 Step 6: Display Output Table
-    # 🔴 -----------------------------------------
+    # ⬤ -----------------------------------------
+    # ⬤ Step 6: Display Output Table
+    # ⬤ -----------------------------------------
     if result_rows:
         output_df = pd.DataFrame(result_rows)
 
@@ -282,7 +193,6 @@ edited_df = st.data_editor(
 
         st.dataframe(output_df[output_cols], use_container_width=True)
 
-        # Optional download
         st.download_button(
             label="Download Quote Output",
             data=output_df.to_excel(index=False, engine="openpyxl"),
