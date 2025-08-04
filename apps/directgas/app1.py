@@ -39,12 +39,7 @@ if uploaded_file:
     durations = [12, 24, 36]
     all_cols = base_cols.copy()
 
-    for d in durations:
-        all_cols += [
-            f"Base Standing Charge ({d}m)", f"Base Unit Rate ({d}m)",
-            f"Standing Charge Uplift ({d}m)", f"Uplift Unit Rate ({d}m)",
-            f"TAC £({d}m)", f"Margin £({d}m)"
-        ]
+input_df, all_cols = create_input_dataframe()
 
 
 input_df, all_cols = create_input_dataframe(base_cols, durations)
