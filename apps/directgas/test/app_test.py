@@ -84,6 +84,34 @@ if uploaded_file:
     # 🔴 -----------------------------------------
     # 🔴 Step 5: Preview Output Table – TAC & Margin
     # 🔴 -----------------------------------------
+    # 🔴 -----------------------------------------
+    # 🔴 Step 5B: Inject Base Rates Back into Editable Grid
+    # 🔴 Purpose: Ensure base rates (SC & Unit) show alongside user-entered data
+    # 🔴 Notes: This prevents “ghost” calculations and aligns user view with logic
+    # 🔴 -----------------------------------------
+
+    # Create a copy of the input for visible augmentation
+    preview_df = edited_df.copy()
+
+    for i, row in edited_df.iterrows():
+        postcode = row.get("Post Code", "")
+        try:
+            kwh = float(row.get("Annual KWH", 0))
+        except (ValueError, TypeError):
+            continue
+
+        if not postcode or kwh <= 0:
+            continue
+
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+
+        for duration in durations:
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+
+    # Replace the editor with version containing base prices
+    edited_df = preview_df
     st.subheader("Customer-Facing Output Preview")
     result_rows = []
 
