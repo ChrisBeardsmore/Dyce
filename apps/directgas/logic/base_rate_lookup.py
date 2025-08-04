@@ -14,6 +14,7 @@
 # 🔴   - Returns (0.0, 0.0) if no match is found
 # 🔴   - Prioritises lowest Unit Rate when multiple matches exist
 # 🔴 -----------------------------------------
+import pandas as pd
 def get_base_rates(ldz: str, kwh: float, duration: int, carbon_offset_required: bool, flat_df: pd.DataFrame) -> tuple[float, float]:
     """Match a quote row and return best Standing Charge and Unit Rate."""
 
