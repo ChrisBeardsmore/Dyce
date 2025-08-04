@@ -17,6 +17,7 @@ import io
 from PIL import Image
 from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 from apps.directgas.logic.base_price_lookup import get_base_rates
+from apps.directgas.logic.tac_calculator import calculate_tac_and_margin
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
@@ -83,14 +84,11 @@ if uploaded_file:
             row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
             row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
-            uplift_unit = min(float(row.get(f"Uplift Unit Rate ({duration}m)", 0)), 3.000)
-            uplift_sc = min(float(row.get(f"Standing Charge Uplift ({duration}m)", 0)), 100.0)
+         uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
+uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
 
-            sell_unit = base_unit + uplift_unit
-            sell_sc = base_sc + uplift_sc
-            base_tac = round((base_unit * kwh + base_sc * 365) / 100, 2)
-            sell_tac = round((sell_unit * kwh + sell_sc * 365) / 100, 2)
-            margin = round(sell_tac - base_tac, 2)
+sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+  
 
             row_data[f"TAC £({duration}m)"] = sell_tac
             row_data[f"Margin £({duration}m)"] = margin
