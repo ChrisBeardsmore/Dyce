@@ -1,13 +1,14 @@
 # 🔴 -----------------------------------------
 # 🔴 File: app_test.py
 # 🔴 Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
-# 🔴 Dependencies: logic modules from /logic/, Streamlit, pandas, PIL
+# 🔴 Dependencies: logic modules from /apps/directgas/logic/
 # 🔴 -----------------------------------------
 
 import sys
 import os
-# 🔴 Fix path so Python can find top-level 'apps' folder
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+
+# 🔴 Fix: Add /apps to the Python path so we can import directgas as a top-level module
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
 
 import streamlit as st
 import pandas as pd
@@ -19,13 +20,14 @@ from directgas.logic.base_price_lookup import get_base_rates
 from directgas.logic.tac_calculator import calculate_tac_and_margin
 from directgas.logic.flat_file_loader import load_flat_file
 from directgas.logic.input_setup import create_input_dataframe
+
 # 🔴 -----------------------------------------
 # 🔴 UI Setup: Page settings and branding
 # 🔴 -----------------------------------------
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
+st.title("Gas Multi-site Quote Builder – Final Version")
+
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
