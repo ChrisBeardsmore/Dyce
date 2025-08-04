@@ -14,12 +14,11 @@ import pandas as pd
 from PIL import Image
 
 # 🔴 Import core logic modules
-from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
-from apps.directgas.logic.base_price_lookup import get_base_rates
-from apps.directgas.logic.tac_calculator import calculate_tac_and_margin
-from apps.directgas.logic.flat_file_loader import load_flat_file
-from apps.directgas.logic.input_setup import create_input_dataframe
-
+from directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
+from directgas.logic.base_price_lookup import get_base_rates
+from directgas.logic.tac_calculator import calculate_tac_and_margin
+from directgas.logic.flat_file_loader import load_flat_file
+from directgas.logic.input_setup import create_input_dataframe
 # 🔴 -----------------------------------------
 # 🔴 UI Setup: Page settings and branding
 # 🔴 -----------------------------------------
