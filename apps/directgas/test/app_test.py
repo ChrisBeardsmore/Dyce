@@ -1,30 +1,28 @@
-# ⬤ -----------------------------------------
-# ⬤ File: app_test.py
-# ⬤ Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
-# ⬤ Dependencies: logic modules from /apps/directgas/logic/
-# ⬤ -----------------------------------------
+# -----------------------------------------
+# File: app_test.py
+# Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
+# Dependencies: logic modules from /apps/directgas/logic/
+# -----------------------------------------
 
 import sys
 import os
-
-# ⬤ Fix: Add /apps to the Python path so we can import directgas as a top-level module
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
-
 import streamlit as st
 import pandas as pd
 from PIL import Image
 
-# ⬤ Import core logic modules
+# Fix: Add /apps to the Python path so we can import directgas as a top-level module
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
+
+# Import core logic modules
 from directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 from directgas.logic.base_rate_lookup import get_base_rates
 from directgas.logic.tac_calculator import calculate_tac_and_margin
 from directgas.logic.flat_file_loader import load_flat_file
 from directgas.logic.input_setup import create_input_dataframe
 
-# ⬤ -----------------------------------------
-# ⬤ UI Setup: Page settings and branding
-# ⬤ -----------------------------------------
-
+# -----------------------------------------
+# UI Setup: Page settings and branding
+# -----------------------------------------
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
 
@@ -37,33 +35,32 @@ with col2:
     except FileNotFoundError:
         st.warning("⚠️ Logo not found")
 
-# ⬤ -----------------------------------------
-# ⬤ Step 1: Load LDZ reference data
-# ⬤ -----------------------------------------
+# -----------------------------------------
+# Step 1: Load LDZ reference data
+# -----------------------------------------
 ldz_df = load_ldz_data()
 
-# ⬤ -----------------------------------------
-# ⬤ Step 2: Upload Supplier Flat File
-# ⬤ -----------------------------------------
+# -----------------------------------------
+# Step 2: Upload Supplier Flat File
+# -----------------------------------------
 uploaded_file = st.file_uploader("Upload Supplier Flat File (XLSX)", type=["xlsx"])
 
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 3: Quote Configuration Inputs
-    # ⬤ -----------------------------------------
+    # -----------------------------------------
+    # Step 3: Quote Configuration Inputs
+    # -----------------------------------------
     st.subheader("Quote Configuration")
     customer_name = st.text_input("Customer Name")
     product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
     carbon_offset_required = product_type == "Carbon Off"
     output_filename = st.text_input("Output file name", value="dyce_quote")
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 3B: Add Sites via Input Form
-    # ⬤ -----------------------------------------
+    # -----------------------------------------
+    # Step 3B: Add Sites via Input Form
+    # -----------------------------------------
     st.subheader("🔹 Add Sites to Quote")
-
     if "input_df" not in st.session_state:
         st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
@@ -78,7 +75,6 @@ if uploaded_file:
                 consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
             except ValueError:
                 consumption = 0.0
-
         submitted = st.form_submit_button("➕ Add Site")
 
     if submitted:
@@ -97,20 +93,17 @@ if uploaded_file:
                     f"TAC £({d}m)": 0,
                     f"Margin £({d}m)": 0
                 })
-
-            st.session_state.input_df = pd.concat(
-                [st.session_state.input_df, pd.DataFrame([new_row])],
-                ignore_index=True
-            )
+            st.session_state.input_df = pd.concat([
+                st.session_state.input_df,
+                pd.DataFrame([new_row])
+            ], ignore_index=True)
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 4: Editable Input Grid Setup
-    # ⬤ -----------------------------------------
+    # -----------------------------------------
+    # Step 4: Editable Input Grid Setup
+    # -----------------------------------------
     st.subheader("Input Grid (Editable)")
-    durations = [12, 24, 36]
-
     edited_df = st.data_editor(
         st.session_state.input_df,
         use_container_width=True,
@@ -119,36 +112,30 @@ if uploaded_file:
         disabled=[]
     )
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 5B: Inject Base Rates Back into Editable Grid
-    # ⬤ -----------------------------------------
+    # -----------------------------------------
+    # Step 5: Inject Base Rates Back into Editable Grid
+    # -----------------------------------------
     preview_df = edited_df.copy()
-
     for i, row in edited_df.iterrows():
         postcode = row.get("Post Code", "")
         try:
             kwh = float(row.get("Annual KWH", 0))
         except (ValueError, TypeError):
             continue
-
         if not postcode or kwh <= 0:
             continue
-
         ldz = match_postcode_to_ldz(postcode, ldz_df)
-
-        for duration in durations:
+        for duration in [12, 24, 36]:
             base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
             preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
             preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
     edited_df = preview_df
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 5C: Calculate TAC & Margin Values
-    # ⬤ -----------------------------------------
-    st.subheader("Customer-Facing Output Preview")
+    # -----------------------------------------
+    # Step 6: Calculate TAC & Margin Values
+    # -----------------------------------------
     result_rows = []
-
     for _, row in edited_df.iterrows():
         site = row.get("Site Name", "").strip()
         postcode = row.get("Post Code", "").strip()
@@ -156,43 +143,34 @@ if uploaded_file:
             kwh = float(row.get("Annual KWH", 0))
         except (ValueError, TypeError):
             continue
-
         if not postcode or kwh <= 0:
             continue
-
         ldz = match_postcode_to_ldz(postcode, ldz_df)
-
         row_data = {
             "Site Name": site,
             "Post Code": postcode,
             "Annual KWH": kwh
         }
-
-        for duration in durations:
+        for duration in [12, 24, 36]:
             base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
             uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
             uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
             sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-
             row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
             row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
             row_data[f"TAC £({duration}m)"] = sell_tac
             row_data[f"Margin £({duration}m)"] = margin
-
         result_rows.append(row_data)
 
-    # ⬤ -----------------------------------------
-    # ⬤ Step 6: Display Output Table
-    # ⬤ -----------------------------------------
+    # -----------------------------------------
+    # Step 7: Display Output Table
+    # -----------------------------------------
     if result_rows:
         output_df = pd.DataFrame(result_rows)
-
         output_cols = ["Site Name", "Post Code", "Annual KWH"] + \
-                      [f"TAC £({d}m)" for d in durations] + \
-                      [f"Margin £({d}m)" for d in durations]
-
+                      [f"TAC £({d}m)" for d in [12, 24, 36]] + \
+                      [f"Margin £({d}m)" for d in [12, 24, 36]]
         st.dataframe(output_df[output_cols], use_container_width=True)
-
         st.download_button(
             label="Download Quote Output",
             data=output_df.to_excel(index=False, engine="openpyxl"),
