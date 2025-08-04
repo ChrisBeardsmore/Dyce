@@ -63,6 +63,80 @@ if uploaded_file:
     carbon_offset_required = product_type == "Carbon Off"
     output_filename = st.text_input("Output file name", value="dyce_quote")
 
+    🔴 -----------------------------------------
+# 🔴 Step 3B: Add Sites via Input Form
+# 🔴 Purpose: Allow quick entry of multiple sites before showing full grid
+# 🔴 Notes:
+# 🔴   - Each submitted site is added as a new row
+# 🔴   - Fields: Site Name, Postcode, Annual KWH (optional MPAN support)
+# 🔴   - Replaces need to edit blank rows manually
+# 🔴 -----------------------------------------
+
+st.subheader("🔹 Add Sites to Quote")
+
+# Create or recall session state for input_df
+if "input_df" not in st.session_state:
+    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+
+with st.form("add_site_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        site_name = st.text_input("Site Name")
+        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+    with col2:
+        postcode = st.text_input("Post Code")
+        try:
+            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+        except ValueError:
+            consumption = 0.0
+
+    submitted = st.form_submit_button("➕ Add Site")
+
+if submitted:
+    if site_name and postcode and consumption > 0:
+        new_row = {
+            "Site Name": site_name.strip(),
+            "Post Code": postcode.strip(),
+            "Annual KWH": consumption
+        }
+
+        # Add default 0s for pricing/uplift columns
+        for d in [12, 24, 36]:
+            new_row.update({
+                f"Base Standing Charge ({d}m)": 0,
+                f"Base Unit Rate ({d}m)": 0,
+                f"Standing Charge Uplift ({d}m)": 0,
+                f"Uplift Unit Rate ({d}m)": 0,
+                f"TAC £({d}m)": 0,
+                f"Margin £({d}m)": 0
+            })
+
+        # Add to session_state DataFrame
+        st.session_state.input_df = pd.concat(
+            [st.session_state.input_df, pd.DataFrame([new_row])],
+            ignore_index=True
+        )
+    else:
+        st.warning("Please enter valid Site Name, Post Code, and KWH.")
+
+🧠 What This Does:
+It tracks added sites via st.session_state.input_df
+
+Each new row is cleanly added to the input grid
+
+When you hit Step 4, you just display this full dataframe:
+
+python
+Copy
+Edit
+edited_df = st.data_editor(
+    st.session_state.input_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    hide_index=True,
+    disabled=[]
+)
+
     # 🔴 -----------------------------------------
     # 🔴 Step 4: Editable Input Grid Setup
     # 🔴 -----------------------------------------
