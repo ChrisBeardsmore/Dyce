@@ -6,10 +6,8 @@ from PIL import Image
 from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 from apps.directgas.logic.base_price_lookup import get_base_rates
 from apps.directgas.logic.tac_calculator import calculate_tac_and_margin
+from apps.directgas.logic.flat_file_loader import load_flat_file
 
-# Dummy placeholder for missing function
-def load_flat_file(uploaded_file):
-    return pd.read_excel(uploaded_file)
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
