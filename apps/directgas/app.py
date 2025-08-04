@@ -16,6 +16,7 @@ import pandas as pd
 import io
 from PIL import Image
 from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
+from apps.directgas.logic.base_price_lookup import get_base_rates
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
@@ -76,22 +77,8 @@ if uploaded_file:
         ldz = match_postcode_to_ldz(postcode, ldz_df)
         row_data = {"Site Name": site, "Post Code": postcode, "Annual KWH": kwh}
 
-        for duration in durations:
-            match = flat_df[
-                (flat_df["LDZ"] == ldz) &
-                (flat_df["Contract_Duration"] == duration) &
-                (flat_df["Minimum_Annual_Consumption"] <= kwh) &
-                (flat_df["Maximum_Annual_Consumption"] >= kwh) &
-                (flat_df["Carbon_Offset"] == carbon_offset_required)
-            ]
-
-            if not match.empty:
-                t = match.sort_values("Unit_Rate").iloc[0]
-                base_unit = t["Unit_Rate"]
-                base_sc = t["Standing_Charge"]
-            else:
-                base_unit = 0.0
-                base_sc = 0.0
+       
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
 
             row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
             row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
