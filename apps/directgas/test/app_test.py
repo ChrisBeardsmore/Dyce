@@ -52,35 +52,35 @@ if uploaded_file:
     # Step 3: Quote Configuration Inputs
     # -----------------------------------------
     st.subheader("Quote Configuration")
+    customer_name = st.text_input("Customer Name")
+    product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
+    carbon_offset_required = product_type == "Carbon Off"
+    output_filename = st.text_input("Output file name", value="dyce_quote")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        customer_name = st.text_input("Customer Name")
-        product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
-    with col2:
-        output_filename = st.text_input("Output file name", value="dyce_quote")
-        carbon_offset_required = product_type == "Carbon Off"
+    # -----------------------------------------
+    # Step 3B: Add Sites via Input Form
+    # -----------------------------------------
+    st.subheader("🔹 Add Sites to Quote")
 
-# -----------------------------------------
-# Step 3B: Add Sites via Input Form
-# -----------------------------------------
-st.subheader("🔹 Add Sites to Quote")
+    if "input_df" not in st.session_state:
+        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
-if "input_df" not in st.session_state:
-    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+    with st.form("add_site_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_name = st.text_input("Site Name")
+            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+        with col2:
+            postcode = st.text_input("Post Code")
+            try:
+                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+            except ValueError:
+                consumption = 0.0
+        submitted = st.form_submit_button("➕ Add Site")
 
-with st.form("add_site_form", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        site_name = st.text_input("Site Name")
-        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-    with col2:
-        postcode = st.text_input("Post Code")
-        try:
-            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-        except ValueError:
-            consumption = 0.0
-    submitted = st.form_submit_button("➕ Add Site")
+    if submitted:
+        # your logic for LDZ match and base rate injection
+        ...
 
 if submitted:
     if site_name and postcode and consumption > 0:
