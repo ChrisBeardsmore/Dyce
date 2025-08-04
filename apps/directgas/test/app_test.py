@@ -57,27 +57,28 @@ if uploaded_file:
     carbon_offset_required = product_type == "Carbon Off"
     output_filename = st.text_input("Output file name", value="dyce_quote")
 
-    # -----------------------------------------
-    # Step 3B: Add Sites via Input Form
-    # -----------------------------------------
-    st.subheader("🔹 Add Sites to Quote")
-    if "input_df" not in st.session_state:
-        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+# -----------------------------------------
+# Step 3B: Add Sites via Input Form
+# -----------------------------------------
+st.subheader("🔹 Add Sites to Quote")
 
-    with st.form("add_site_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            site_name = st.text_input("Site Name")
-            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-        with col2:
-            postcode = st.text_input("Post Code")
-            try:
-                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-            except ValueError:
-                consumption = 0.0
-        submitted = st.form_submit_button("➕ Add Site")
+if "input_df" not in st.session_state:
+    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
-    if submitted:
+with st.form("add_site_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        site_name = st.text_input("Site Name")
+        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+    with col2:
+        postcode = st.text_input("Post Code")
+        try:
+            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+        except ValueError:
+            consumption = 0.0
+    submitted = st.form_submit_button("➕ Add Site")
+
+if submitted:
     if site_name and postcode and consumption > 0:
         ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
         new_row = {
@@ -103,7 +104,7 @@ if uploaded_file:
         ], ignore_index=True)
     else:
         st.warning("Please enter valid Site Name, Post Code, and KWH.")
-
+  
 
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
