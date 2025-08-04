@@ -47,7 +47,7 @@ if uploaded_file:
         ]
 
 
-
+input_df, all_cols = create_input_dataframe(base_cols, durations)
     edited_df = st.data_editor(
         input_df,
         use_container_width=True,
