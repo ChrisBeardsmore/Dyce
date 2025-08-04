@@ -15,6 +15,7 @@ import streamlit as st
 import pandas as pd
 import io
 from PIL import Image
+from apps.directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
 
 st.set_page_config(page_title="Gas Multi-tool (Final)", layout="wide")
 st.title("Gas Multi-site Quote Builder – Final Version")
@@ -27,31 +28,6 @@ with col2:
         st.image(logo, width=120)
     except:
         st.warning("⚠️ Logo not found")
-
-# Cached data loaders
-@st.cache_data
-def load_ldz_data():
-    url = "https://raw.githubusercontent.com/ChrisBeardsmore/Gas-Pricing/main/postcode_ldz_full.csv"
-    df = pd.read_csv(url)
-    df["Postcode"] = df["Postcode"].astype(str).str.upper().str.replace(r"\s+", "", regex=True)
-    return df
-
-@st.cache_data
-def load_flat_file(uploaded_file):
-    df = pd.read_excel(uploaded_file)
-    df["LDZ"] = df["LDZ"].astype(str).str.strip().str.upper()
-    df["Contract_Duration"] = pd.to_numeric(df["Contract_Duration"], errors='coerce').fillna(0).astype(int)
-    df["Minimum_Annual_Consumption"] = pd.to_numeric(df["Minimum_Annual_Consumption"], errors='coerce').fillna(0)
-    df["Maximum_Annual_Consumption"] = pd.to_numeric(df["Maximum_Annual_Consumption"], errors='coerce').fillna(0)
-    return df
-
-def match_postcode_to_ldz(postcode, ldz_df):
-    postcode = postcode.replace(" ", "").upper()
-    for length in [7, 6, 5, 4, 3]:
-        match = ldz_df[ldz_df["Postcode"].str.startswith(postcode[:length])]
-        if not match.empty:
-            return match.iloc[0]["LDZ"]
-    return ""
 
 # File upload and input config
 ldz_df = load_ldz_data()
