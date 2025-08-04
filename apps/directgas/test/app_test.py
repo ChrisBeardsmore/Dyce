@@ -52,10 +52,14 @@ if uploaded_file:
     # Step 3: Quote Configuration Inputs
     # -----------------------------------------
     st.subheader("Quote Configuration")
-    customer_name = st.text_input("Customer Name")
-    product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
-    carbon_offset_required = product_type == "Carbon Off"
-    output_filename = st.text_input("Output file name", value="dyce_quote")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        customer_name = st.text_input("Customer Name")
+        product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
+    with col2:
+        output_filename = st.text_input("Output file name", value="dyce_quote")
+        carbon_offset_required = product_type == "Carbon Off"
 
 # -----------------------------------------
 # Step 3B: Add Sites via Input Form
