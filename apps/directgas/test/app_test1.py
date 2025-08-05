@@ -238,6 +238,14 @@ if uploaded_file:
             preview_df.at[i, f"Margin £({duration}m)"] = margin
 
     edited_df = preview_df
+    # DEBUG: Add this right after Step 5 (after "edited_df = preview_df")
+    st.write("🔍 DEBUG INFO:")
+    st.write(f"Number of rows being processed: {len(edited_df)}")
+    if not edited_df.empty:
+       first_row = edited_df.iloc[0]
+       st.write(f"First row Final SC (12m): {first_row.get('Final Standing Charge (12m)', 'MISSING')}")
+       st.write(f"First row Final Unit (12m): {first_row.get('Final Unit Rate (12m)', 'MISSING')}")
+       st.write(f"First row SC Uplift (12m): {first_row.get('Standing Charge Uplift (12m)', 'MISSING')}")
 
     # -----------------------------------------
     # Step 6: Prepare Customer-Facing Output Data
