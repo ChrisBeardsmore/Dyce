@@ -113,14 +113,45 @@ if uploaded_file:
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
     # -----------------------------------------
-    st.subheader("Input Grid (Editable)")
-    edited_df = st.data_editor(
-        st.session_state.input_df,
-        use_container_width=True,
-        num_rows="dynamic",
-        hide_index=True,
-        disabled=[]
+st.subheader("Input Grid (Editable)")
+
+# Configure column types and validation
+column_config = {
+    "Annual KWH": st.column_config.NumberColumn(
+        "Annual KWH",
+        min_value=0,
+        step=1,
+        format="%.0f"
     )
+}
+
+# Add configurations for uplift columns
+for duration in [12, 24, 36]:
+    column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
+        f"SC Uplift ({duration}m)",
+        min_value=0,
+        max_value=100.0,
+        step=0.01,
+        format="%.2f",
+        help="Max 100p/day"
+    )
+    column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+        f"Unit Uplift ({duration}m)", 
+        min_value=0,
+        max_value=3.000,
+        step=0.001,
+        format="%.3f",
+        help="Max 3.000p/kWh"
+    )
+edited_df = st.data_editor(
+    st.session_state.input_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    hide_index=True,
+    column_config=column_config,
+    disabled=[]
+)
+    
 
     # -----------------------------------------
     # Step 5: Inject Base Rates Back into Editable Grid
