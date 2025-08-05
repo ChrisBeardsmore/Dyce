@@ -9,7 +9,7 @@ import pandas as pd
 # 🔴   - df (pd.DataFrame): Editable DataFrame prefilled with column headers and placeholders
 # 🔴   - all_cols (list): Ordered list of all column names (used for consistency)
 # 🔴 Notes:
-# 🔴   - Includes base pricing, uplift inputs, and placeholder fields for TAC/margin
+# 🔴   - Includes base pricing, uplift inputs, and TAC/margin for sales person view
 # 🔴   - Covers contract durations: 12, 24, and 36 months
 # 🔴 -----------------------------------------
 def create_input_dataframe(num_rows: int = 10) -> tuple[pd.DataFrame, list]:
@@ -19,7 +19,7 @@ def create_input_dataframe(num_rows: int = 10) -> tuple[pd.DataFrame, list]:
     base_cols = ["Site Name", "Post Code", "Annual KWH"]
     durations = [12, 24, 36]
 
-    # Build column list for all durations
+    # Build column list for all durations - SALES PERSON VIEW
     all_cols = base_cols.copy()
     for d in durations:
         all_cols += [
@@ -27,8 +27,10 @@ def create_input_dataframe(num_rows: int = 10) -> tuple[pd.DataFrame, list]:
             f"Base Unit Rate ({d}m)",
             f"Standing Charge Uplift ({d}m)",
             f"Uplift Unit Rate ({d}m)",
-            f"TAC £({d}m)",
-            f"Margin £({d}m)"
+            f"Final Standing Charge ({d}m)",  # NEW: base + uplift
+            f"Final Unit Rate ({d}m)",        # NEW: base + uplift
+            f"TAC £({d}m)",                   # NEW: visible to sales person
+            f"Margin £({d}m)"                 # NEW: visible to sales person
         ]
 
     # Initialize DataFrame with default values:
