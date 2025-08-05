@@ -96,10 +96,10 @@ if uploaded_file:
                     new_row.update({
                         f"Base Standing Charge ({d}m)": round(base_sc, 2),
                         f"Base Unit Rate ({d}m)": round(base_unit, 3),
-                        f"Standing Charge Uplift ({d}m)": 0.00,
-                        f"Uplift Unit Rate ({d}m)": 0.000,
-                        f"TAC £({d}m)": 0.00,
-                        f"Margin £({d}m)": 0.00
+                        f"Standing Charge Uplift ({d}m)": 0,
+                        f"Uplift Unit Rate ({d}m)": 0,
+                        f"TAC £({d}m)": 0,
+                        f"Margin £({d}m)": 0
                     })
 
                 st.session_state.input_df = pd.concat([
@@ -151,59 +151,77 @@ if uploaded_file:
     )
 
     # -----------------------------------------
-    # Step 5: Inject Base Rates + Step 6: Recalculate TAC & Margin
+    # Step 5: Inject Base Rates Back into Editable Grid
     # -----------------------------------------
+    preview_df = edited_df.copy()
     for i, row in edited_df.iterrows():
+        postcode = row.get("Post Code", "")
         try:
             kwh = float(row.get("Annual KWH", 0))
-            postcode = row.get("Post Code", "").strip()
-            ldz = match_postcode_to_ldz(postcode, ldz_df)
-        except:
+        except (ValueError, TypeError):
             continue
-
         if not postcode or kwh <= 0:
             continue
-
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
         for duration in [12, 24, 36]:
-            try:
-                base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-                uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0))
-                uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0))
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
-                tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-
-                edited_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-                edited_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-                edited_df.at[i, f"TAC £({duration}m)"] = round(tac, 2)
-                edited_df.at[i, f"Margin £({duration}m)"] = round(margin, 2)
-            except:
-                continue
-
-    st.session_state.input_df = edited_df
+    edited_df = preview_df
 
     # -----------------------------------------
-    # Step 7: Display Output Table + Download
+    # Step 6: Calculate TAC & Margin Values
     # -----------------------------------------
-    st.subheader("Quote Output")
+    result_rows = []
+    for _, row in edited_df.iterrows():
+        site = row.get("Site Name", "").strip()
+        postcode = row.get("Post Code", "").strip()
+        try:
+            kwh = float(row.get("Annual KWH", 0))
+        except (ValueError, TypeError):
+            continue
+        if not postcode or kwh <= 0:
+            continue
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        row_data = {
+            "Site Name": site,
+            "Post Code": postcode,
+            "Annual KWH": kwh
+        }
+        for duration in [12, 24, 36]:
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
+            uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
+            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+            row_data[f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            row_data[f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+            row_data[f"TAC £({duration}m)"] = sell_tac
+            row_data[f"Margin £({duration}m)"] = margin
+        result_rows.append(row_data)
 
-    output_cols = ["Site Name", "Post Code", "Annual KWH"] + \
-                  [f"TAC £({d}m)" for d in [12, 24, 36]] + \
-                  [f"Margin £({d}m)" for d in [12, 24, 36]]
+    # -----------------------------------------
+    # Step 7: Display Output Table
+    # -----------------------------------------
+    if result_rows:
+        output_df = pd.DataFrame(result_rows)
+        output_cols = ["Site Name", "Post Code", "Annual KWH"] + \
+                      [f"TAC £({d}m)" for d in [12, 24, 36]] + \
+                      [f"Margin £({d}m)" for d in [12, 24, 36]]
+        output_df = output_df[output_cols].copy()
+        st.dataframe(output_df, use_container_width=True)
 
-    output_df = edited_df[output_cols].copy()
-    st.dataframe(output_df, use_container_width=True)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            output_df.to_excel(writer, index=False)
+        output.seek(0)
 
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        output_df.to_excel(writer, index=False)
-    output.seek(0)
-
-    st.download_button(
-        label="Download Quote Output",
-        data=output,
-        file_name=f"{output_filename}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+        st.download_button(
+            label="Download Quote Output",
+            data=output,
+            file_name=f"{output_filename}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 else:
     st.info("📁 Please upload a supplier flat file to begin creating quotes.")
