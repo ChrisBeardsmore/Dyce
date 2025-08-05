@@ -202,8 +202,8 @@ edited_df = preview_df
     # -----------------------------------------
     result_rows = []
     for _, row in edited_df.iterrows():
-        site = row.get("Site Name", "").strip()
-        postcode = row.get("Post Code", "").strip()
+        site = str(row.get("Site Name", "") or "").strip()
+        postcode = str(row.get("Post Code", "") or "").strip()
         try:
             kwh = float(row.get("Annual KWH", 0))
         except (ValueError, TypeError):
