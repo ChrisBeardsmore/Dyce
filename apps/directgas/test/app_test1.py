@@ -61,53 +61,54 @@ if uploaded_file:
     # -----------------------------------------
     # Step 3B: Add Sites via Input Form
     # -----------------------------------------
-   st.subheader("🔹 Add Sites to Quote")
+    st.subheader("🔹 Add Sites to Quote")
 
-if "input_df" not in st.session_state:
-    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+    if "input_df" not in st.session_state:
+        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
-with st.form("add_site_form", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        site_name = st.text_input("Site Name")
-        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-    with col2:
-        postcode = st.text_input("Post Code")
-        try:
-            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-        except ValueError:
-            consumption = 0.0
-    submitted = st.form_submit_button("➕ Add Site")
+    with st.form("add_site_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_name = st.text_input("Site Name")
+            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+        with col2:
+            postcode = st.text_input("Post Code")
+            try:
+                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+            except ValueError:
+                consumption = 0.0
+        submitted = st.form_submit_button("➕ Add Site")
 
-if submitted:
-    if site_name and postcode and consumption > 0:
-        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-        if not ldz:
-            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+    if submitted:
+        if site_name and postcode and consumption > 0:
+            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+            if not ldz:
+                st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+            else:
+                new_row = {
+                    "Site Name": site_name.strip(),
+                    "Post Code": postcode.strip(),
+                    "Annual KWH": consumption
+                }
+
+                for d in [12, 24, 36]:
+                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                    new_row.update({
+                        f"Base Standing Charge ({d}m)": round(base_sc, 2),
+                        f"Base Unit Rate ({d}m)": round(base_unit, 3),
+                        f"Standing Charge Uplift ({d}m)": 0.00,
+                        f"Uplift Unit Rate ({d}m)": 0.000,
+                        f"TAC £({d}m)": 0.00,
+                        f"Margin £({d}m)": 0.00
+                    })
+
+                st.session_state.input_df = pd.concat([
+                    st.session_state.input_df,
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
         else:
-            new_row = {
-                "Site Name": site_name.strip(),
-                "Post Code": postcode.strip(),
-                "Annual KWH": consumption
-            }
+            st.warning("Please enter valid Site Name, Post Code, and KWH.")
 
-            for d in [12, 24, 36]:
-                base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-                new_row.update({
-                    f"Base Standing Charge ({d}m)": round(base_sc, 2),
-                    f"Base Unit Rate ({d}m)": round(base_unit, 3),
-                    f"Standing Charge Uplift ({d}m)": 0.00,
-                    f"Uplift Unit Rate ({d}m)": 0.000,
-                    f"TAC £({d}m)": 0.00,
-                    f"Margin £({d}m)": 0.00
-                })
-
-            st.session_state.input_df = pd.concat([
-                st.session_state.input_df,
-                pd.DataFrame([new_row])
-            ], ignore_index=True)
-    else:
-        st.warning("Please enter valid Site Name, Post Code, and KWH.")
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
     # -----------------------------------------
@@ -150,86 +151,59 @@ if submitted:
     )
 
     # -----------------------------------------
-    # Step 5: Inject Base Rates Back into Editable Grid
+    # Step 5: Inject Base Rates + Step 6: Recalculate TAC & Margin
     # -----------------------------------------
-    preview_df = edited_df.copy()
     for i, row in edited_df.iterrows():
-        postcode = row.get("Post Code", "")
         try:
             kwh = float(row.get("Annual KWH", 0))
-        except (ValueError, TypeError):
-            continue
-        if not postcode or kwh <= 0:
-            continue
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
-        for duration in [12, 24, 36]:
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-
-    edited_df = preview_df
-
-    # -----------------------------------------
-    # Step 6: Calculate TAC & Margin Values
-    # -----------------------------------------
-    edited_df = st.data_editor(
-    st.session_state.input_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    hide_index=True,
-    column_config=column_config,
-    disabled=[]
-)
-
-for i, row in edited_df.iterrows():
-    try:
-        kwh = float(row.get("Annual KWH", 0))
-        postcode = row.get("Post Code", "").strip()
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
-    except:
-        continue
-
-    if not postcode or kwh <= 0:
-        continue
-
-    for duration in [12, 24, 36]:
-        try:
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-            uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0))
-            uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0))
-
-            tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-
-            edited_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            edited_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-            edited_df.at[i, f"TAC £({duration}m)"] = round(tac, 2)
-            edited_df.at[i, f"Margin £({duration}m)"] = round(margin, 2)
+            postcode = row.get("Post Code", "").strip()
+            ldz = match_postcode_to_ldz(postcode, ldz_df)
         except:
             continue
 
-# Update the session state with the recalculated version
-st.session_state.input_df = edited_df
-    # -----------------------------------------
-    # Step 7: Display Output Table
-    # -----------------------------------------
-    if result_rows:
-        output_df = pd.DataFrame(result_rows)
-        output_cols = ["Site Name", "Post Code", "Annual KWH"] + \
-                      [f"TAC £({d}m)" for d in [12, 24, 36]] + \
-                      [f"Margin £({d}m)" for d in [12, 24, 36]]
-        st.dataframe(output_df[output_cols], use_container_width=True)
+        if not postcode or kwh <= 0:
+            continue
 
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            output_df.to_excel(writer, index=False)
-        output.seek(0)
+        for duration in [12, 24, 36]:
+            try:
+                base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+                uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0))
+                uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0))
 
-        st.download_button(
-            label="Download Quote Output",
-            data=output,
-            file_name=f"{output_filename}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+                tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+
+                edited_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+                edited_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+                edited_df.at[i, f"TAC £({duration}m)"] = round(tac, 2)
+                edited_df.at[i, f"Margin £({duration}m)"] = round(margin, 2)
+            except:
+                continue
+
+    st.session_state.input_df = edited_df
+
+    # -----------------------------------------
+    # Step 7: Display Output Table + Download
+    # -----------------------------------------
+    st.subheader("Quote Output")
+
+    output_cols = ["Site Name", "Post Code", "Annual KWH"] + \
+                  [f"TAC £({d}m)" for d in [12, 24, 36]] + \
+                  [f"Margin £({d}m)" for d in [12, 24, 36]]
+
+    output_df = edited_df[output_cols].copy()
+    st.dataframe(output_df, use_container_width=True)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        output_df.to_excel(writer, index=False)
+    output.seek(0)
+
+    st.download_button(
+        label="Download Quote Output",
+        data=output,
+        file_name=f"{output_filename}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
     st.info("📁 Please upload a supplier flat file to begin creating quotes.")
