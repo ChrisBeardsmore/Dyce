@@ -6,7 +6,7 @@
 # -----------------------------------------
 
 import pandas as pd
-
+import streamlit as st
 # -----------------------------------------
 # Function: load_ldz_data
 # Purpose: Load the postcode-to-LDZ mapping table from GitHub
@@ -39,18 +39,22 @@ def match_postcode_to_ldz(postcode: str, ldz_df: pd.DataFrame) -> str:
     """Match a postcode to its corresponding LDZ region."""
     postcode = postcode.replace(" ", "").upper()
     
+def match_postcode_to_ldz(postcode: str, ldz_df: pd.DataFrame) -> str:
+    """Match a postcode to its corresponding LDZ region."""
+    postcode = postcode.replace(" ", "").upper()
+    
     # Debug: Show what we're working with
-    print(f"Debug: Looking for postcode: {postcode}")
-    print(f"Debug: LDZ dataframe columns: {list(ldz_df.columns)}")
+    st.write(f"🔍 Debug: Looking for postcode: {postcode}")
+    st.write(f"🔍 Debug: LDZ dataframe columns: {list(ldz_df.columns)}")
     
     # Try longest-to-shortest prefix match (7 to 3 characters)
     for length in [7, 6, 5, 4, 3]:
         match = ldz_df[ldz_df["Postcode"].str.startswith(postcode[:length])]
         if not match.empty:
             result = match.iloc[0]["LDZ"]
-            print(f"Debug: Found match for {postcode[:length]}: {result}")
+            st.write(f"✅ Debug: Found match for {postcode[:length]}: {result}")
             return result
     
     # No match found
-    print(f"Debug: No match found for {postcode}")
+    st.write(f"❌ Debug: No match found for {postcode}")
     return ""
