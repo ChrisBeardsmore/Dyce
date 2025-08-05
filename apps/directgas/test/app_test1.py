@@ -117,87 +117,84 @@ if uploaded_file:
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
 
-    # -----------------------------------------
+   # -----------------------------------------
     # Step 4: Editable Input Grid Setup
     # -----------------------------------------
     st.subheader("Input Grid (Editable)")
 
-    # Configure column types and validation
+    # Configure column types and validation (same as before)
     column_config = {
-        "Annual KWH": st.column_config.NumberColumn(
-            "Annual KWH",
-            min_value=0,
-            step=1,
-            format="%.0f"
-        )
+        "Annual KWH": st.column_config.NumberColumn("Annual KWH", min_value=0, step=1, format="%.0f")
     }
 
-    # Add configurations for uplift columns (editable)
     for duration in [12, 24, 36]:
         column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
-            f"SC Uplift ({duration}m)",
-            min_value=0,
-            max_value=100.0,
-            step=0.01,
-            format="%.2f",
-            help="Max 100p/day"
+            f"SC Uplift ({duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
         )
         column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Unit Uplift ({duration}m)",
-            min_value=0,
-            max_value=3.000,
-            step=0.001,
-            format="%.3f",
-            help="Max 3.000p/kWh"
+            f"Unit Uplift ({duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
         )
-
-    # Add configurations for calculated fields (read-only)
-    for duration in [12, 24, 36]:
         column_config[f"Base Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
-            f"Base SC ({duration}m)",
-            format="%.2f",
-            disabled=True,
-            help="Base rate from supplier (p/day)"
+            f"Base SC ({duration}m)", format="%.2f", disabled=True, help="Base rate from supplier (p/day)"
         )
         column_config[f"Base Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Base Unit ({duration}m)",
-            format="%.3f",
-            disabled=True,
-            help="Base rate from supplier (p/kWh)"
+            f"Base Unit ({duration}m)", format="%.3f", disabled=True, help="Base rate from supplier (p/kWh)"
         )
         column_config[f"Final Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
-            f"Final SC ({duration}m)",
-            format="%.2f",
-            disabled=True,
-            help="Base + Uplift (p/day)"
+            f"Final SC ({duration}m)", format="%.2f", disabled=True, help="Base + Uplift (p/day)"
         )
         column_config[f"Final Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Final Unit ({duration}m)",
-            format="%.3f", 
-            disabled=True,
-            help="Base + Uplift (p/kWh)"
+            f"Final Unit ({duration}m)", format="%.3f", disabled=True, help="Base + Uplift (p/kWh)"
         )
         column_config[f"TAC £({duration}m)"] = st.column_config.NumberColumn(
-            f"TAC £({duration}m)",
-            format="£%.2f",
-            disabled=True,
-            help="Total Annual Cost"
+            f"TAC £({duration}m)", format="£%.2f", disabled=True, help="Total Annual Cost"
         )
         column_config[f"Margin £({duration}m)"] = st.column_config.NumberColumn(
-            f"Margin £({duration}m)",
-            format="£%.2f",
-            disabled=True,
-            help="Dyce profit margin"
+            f"Margin £({duration}m)", format="£%.2f", disabled=True, help="Dyce profit margin"
         )
 
+    # Calculate values BEFORE showing the data editor
+    working_df = st.session_state.input_df.copy()
+    
+    for i, row in working_df.iterrows():
+        postcode = str(row.get("Post Code", "") or "").strip()
+        try:
+            kwh = float(row.get("Annual KWH", 0) or 0)
+        except (ValueError, TypeError):
+            continue
+        if not postcode or kwh <= 0:
+            continue
+        
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        
+        for duration in [12, 24, 36]:
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
+            uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
+            
+            final_sc = base_sc + uplift_sc
+            final_unit = base_unit + uplift_unit
+            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+            
+            working_df.at[i, f"Base Standing Charge ({duration}m)"] = float(round(base_sc, 2))
+            working_df.at[i, f"Base Unit Rate ({duration}m)"] = float(round(base_unit, 3))
+            working_df.at[i, f"Final Standing Charge ({duration}m)"] = float(round(final_sc, 2))
+            working_df.at[i, f"Final Unit Rate ({duration}m)"] = float(round(final_unit, 3))
+            working_df.at[i, f"TAC £({duration}m)"] = float(sell_tac)
+            working_df.at[i, f"Margin £({duration}m)"] = float(margin)
+
+    # Show the data editor with calculated values
     edited_df = st.data_editor(
-        st.session_state.input_df,
+        working_df,
         use_container_width=True,
         num_rows="dynamic",
         hide_index=True,
         column_config=column_config,
         disabled=[]
     )
+    
+    # Update session state with any user changes
+    st.session_state.input_df = edited_df
 
     # -----------------------------------------
     # Step 5: Calculate Values (Optimized - Only When Changed)
