@@ -79,8 +79,12 @@ if uploaded_file:
         submitted = st.form_submit_button("➕ Add Site")
 
     if submitted:
-        if site_name and postcode and consumption > 0:
-            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+    if site_name and postcode and consumption > 0:
+        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+        if not ldz:  # This catches both None and empty string
+            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+        else:
+            # Move all your existing code here (indent it one more level)
             new_row = {
                 "Site Name": site_name.strip(),
                 "Post Code": postcode.strip(),
