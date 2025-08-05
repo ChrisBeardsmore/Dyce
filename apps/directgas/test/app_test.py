@@ -6,6 +6,7 @@
 
 import sys
 import os
+import io
 import streamlit as st
 import pandas as pd
 from PIL import Image
@@ -182,7 +183,7 @@ if uploaded_file:
         st.dataframe(output_df[output_cols], use_container_width=True)
         st.download_button(
             label="Download Quote Output",
-            data=output_df.to_excel(index=False, engine="openpyxl"),
+            data=output,
             file_name=f"{output_filename}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
