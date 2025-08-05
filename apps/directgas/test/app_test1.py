@@ -61,54 +61,53 @@ if uploaded_file:
     # -----------------------------------------
     # Step 3B: Add Sites via Input Form
     # -----------------------------------------
-    st.subheader("🔹 Add Sites to Quote")
+   st.subheader("🔹 Add Sites to Quote")
 
-    if "input_df" not in st.session_state:
-        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+if "input_df" not in st.session_state:
+    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
-    with st.form("add_site_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            site_name = st.text_input("Site Name")
-            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-        with col2:
-            postcode = st.text_input("Post Code")
-            try:
-                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-            except ValueError:
-                consumption = 0.0
-        submitted = st.form_submit_button("➕ Add Site")
+with st.form("add_site_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        site_name = st.text_input("Site Name")
+        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+    with col2:
+        postcode = st.text_input("Post Code")
+        try:
+            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+        except ValueError:
+            consumption = 0.0
+    submitted = st.form_submit_button("➕ Add Site")
 
-    if submitted:
-        if site_name and postcode and consumption > 0:
-            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-            if not ldz:
-                st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
-            else:
-                new_row = {
-                    "Site Name": site_name.strip(),
-                    "Post Code": postcode.strip(),
-                    "Annual KWH": consumption
-                }
-
-                for d in [12, 24, 36]:
-                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-                    new_row.update({
-                        f"Base Standing Charge ({d}m)": round(base_sc, 2),
-                        f"Base Unit Rate ({d}m)": round(base_unit, 3),
-                        f"Standing Charge Uplift ({d}m)": 0,
-                        f"Uplift Unit Rate ({d}m)": 0,
-                        f"TAC £({d}m)": 0,
-                        f"Margin £({d}m)": 0
-                    })
-
-                st.session_state.input_df = pd.concat([
-                    st.session_state.input_df,
-                    pd.DataFrame([new_row])
-                ], ignore_index=True)
+if submitted:
+    if site_name and postcode and consumption > 0:
+        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+        if not ldz:
+            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
         else:
-            st.warning("Please enter valid Site Name, Post Code, and KWH.")
+            new_row = {
+                "Site Name": site_name.strip(),
+                "Post Code": postcode.strip(),
+                "Annual KWH": consumption
+            }
 
+            for d in [12, 24, 36]:
+                base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                new_row.update({
+                    f"Base Standing Charge ({d}m)": round(base_sc, 2),
+                    f"Base Unit Rate ({d}m)": round(base_unit, 3),
+                    f"Standing Charge Uplift ({d}m)": 0.00,
+                    f"Uplift Unit Rate ({d}m)": 0.000,
+                    f"TAC £({d}m)": 0.00,
+                    f"Margin £({d}m)": 0.00
+                })
+
+            st.session_state.input_df = pd.concat([
+                st.session_state.input_df,
+                pd.DataFrame([new_row])
+            ], ignore_index=True)
+    else:
+        st.warning("Please enter valid Site Name, Post Code, and KWH.")
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
     # -----------------------------------------
