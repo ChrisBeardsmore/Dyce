@@ -200,7 +200,7 @@ if uploaded_file:
     )
 
     # -----------------------------------------
-    # Step 5: Calculate All Values (Base Rates + TAC + Margin) - FIXED
+    # Step 5: Calculate All Values (Base Rates + TAC + Margin)
     # -----------------------------------------
     preview_df = edited_df.copy()
     for i, row in edited_df.iterrows():
@@ -215,29 +215,29 @@ if uploaded_file:
         ldz = match_postcode_to_ldz(postcode, ldz_df)
         
         for duration in [12, 24, 36]:
-        # Get base rates from supplier file
-        base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-        
-        # Get uplift values from user input (safe handling)
-        uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
-        uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
-        
-        # Calculate final customer rates (base + uplift)
-        final_sc = base_sc + uplift_sc
-        final_unit = base_unit + uplift_unit
-        
-        # Calculate TAC and margin
-        sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-        
-        # Update all calculated fields - EXPLICIT FLOAT CONVERSION
-        preview_df.at[i, f"Base Standing Charge ({duration}m)"] = float(round(base_sc, 2))
-        preview_df.at[i, f"Base Unit Rate ({duration}m)"] = float(round(base_unit, 3))
-        preview_df.at[i, f"Final Standing Charge ({duration}m)"] = float(round(final_sc, 2))
-        preview_df.at[i, f"Final Unit Rate ({duration}m)"] = float(round(final_unit, 3))
-        preview_df.at[i, f"TAC £({duration}m)"] = float(sell_tac)
-        preview_df.at[i, f"Margin £({duration}m)"] = float(margin)
+            # Get base rates from supplier file
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            
+            # Get uplift values from user input (safe handling)
+            uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
+            uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
+            
+            # Calculate final customer rates (base + uplift)
+            final_sc = base_sc + uplift_sc
+            final_unit = base_unit + uplift_unit
+            
+            # Calculate TAC and margin
+            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+            
+            # Update all calculated fields
+            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = float(round(base_sc, 2))
+            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = float(round(base_unit, 3))
+            preview_df.at[i, f"Final Standing Charge ({duration}m)"] = float(round(final_sc, 2))
+            preview_df.at[i, f"Final Unit Rate ({duration}m)"] = float(round(final_unit, 3))
+            preview_df.at[i, f"TAC £({duration}m)"] = float(sell_tac)
+            preview_df.at[i, f"Margin £({duration}m)"] = float(margin)
 
-edited_df = preview_df
+    edited_df = preview_df
     # -----------------------------------------
     # Step 6: Prepare Customer-Facing Output Data
     # -----------------------------------------
