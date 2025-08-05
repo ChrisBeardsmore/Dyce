@@ -200,44 +200,54 @@ if uploaded_file:
     )
 
     # -----------------------------------------
-    # Step 5: Calculate All Values (Base Rates + TAC + Margin)
+    # Step 5: Calculate Values (Optimized - Only When Changed)
     # -----------------------------------------
-    preview_df = edited_df.copy()
-    for i, row in edited_df.iterrows():
-        postcode = str(row.get("Post Code", "") or "").strip()
-        try:
-            kwh = float(row.get("Annual KWH", 0) or 0)
-        except (ValueError, TypeError):
-            continue
-        if not postcode or kwh <= 0:
-            continue
+    # Add a calculate button to trigger updates
+    if st.button("🔄 Recalculate All Values", type="secondary"):
+        st.session_state['force_recalc'] = True
+    
+    # Only recalculate if data changed or button pressed
+    current_hash = hash(str(edited_df.values.tobytes()) if not edited_df.empty else "empty")
+    last_hash = st.session_state.get('last_hash', None)
+    
+    if (current_hash != last_hash or st.session_state.get('force_recalc', False)):
+        st.session_state['force_recalc'] = False
+        st.session_state['last_hash'] = current_hash
         
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        preview_df = edited_df.copy()
+        for i, row in edited_df.iterrows():
+            postcode = str(row.get("Post Code", "") or "").strip()
+            try:
+                kwh = float(row.get("Annual KWH", 0) or 0)
+            except (ValueError, TypeError):
+                continue
+            if not postcode or kwh <= 0:
+                continue
+            
+            ldz = match_postcode_to_ldz(postcode, ldz_df)
+            
+            for duration in [12, 24, 36]:
+                base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+                uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
+                uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
+                
+                final_sc = base_sc + uplift_sc
+                final_unit = base_unit + uplift_unit
+                sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+                
+                preview_df.at[i, f"Base Standing Charge ({duration}m)"] = float(round(base_sc, 2))
+                preview_df.at[i, f"Base Unit Rate ({duration}m)"] = float(round(base_unit, 3))
+                preview_df.at[i, f"Final Standing Charge ({duration}m)"] = float(round(final_sc, 2))
+                preview_df.at[i, f"Final Unit Rate ({duration}m)"] = float(round(final_unit, 3))
+                preview_df.at[i, f"TAC £({duration}m)"] = float(sell_tac)
+                preview_df.at[i, f"Margin £({duration}m)"] = float(margin)
         
-        for duration in [12, 24, 36]:
-            # Get base rates from supplier file
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-            
-            # Get uplift values from user input (safe handling)
-            uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
-            uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
-            
-            # Calculate final customer rates (base + uplift)
-            final_sc = base_sc + uplift_sc
-            final_unit = base_unit + uplift_unit
-            
-            # Calculate TAC and margin
-            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-            
-            # Update all calculated fields
-            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = float(round(base_sc, 2))
-            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = float(round(base_unit, 3))
-            preview_df.at[i, f"Final Standing Charge ({duration}m)"] = float(round(final_sc, 2))
-            preview_df.at[i, f"Final Unit Rate ({duration}m)"] = float(round(final_unit, 3))
-            preview_df.at[i, f"TAC £({duration}m)"] = float(sell_tac)
-            preview_df.at[i, f"Margin £({duration}m)"] = float(margin)
-
-    edited_df = preview_df
+        # Update session state with calculated values
+        st.session_state.input_df = preview_df
+        st.success("✅ Values recalculated!")
+    
+    # Use the session state data for display
+    edited_df = st.session_state.input_df
     # -----------------------------------------
     # Step 6: Prepare Customer-Facing Output Data
     # -----------------------------------------
