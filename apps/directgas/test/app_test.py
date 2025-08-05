@@ -161,17 +161,17 @@ edited_df = st.data_editor(
         postcode = row.get("Post Code", "")
         try:
             kwh = float(row.get("Annual KWH", 0))
-        except (ValueError, TypeError):
-            continue
-        if not postcode or kwh <= 0:
-            continue
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
-        for duration in [12, 24, 36]:
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+    except (ValueError, TypeError):
+        continue
+    if not postcode or kwh <= 0:
+        continue
+    ldz = match_postcode_to_ldz(postcode, ldz_df)
+    for duration in [12, 24, 36]:
+        base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+        preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+        preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
-    edited_df = preview_df
+     edited_df = preview_df
 
     # -----------------------------------------
     # Step 6: Calculate TAC & Margin Values
