@@ -1,6 +1,6 @@
 # -----------------------------------------
 # File: app_test.py
-# Purpose: Streamlit test frontend for Dyce’s multi-site gas quote builder
+# Purpose: Streamlit test frontend for Dyce's multi-site gas quote builder
 # Dependencies: logic modules from /apps/directgas/logic/
 # -----------------------------------------
 
@@ -79,33 +79,32 @@ if uploaded_file:
         submitted = st.form_submit_button("➕ Add Site")
 
     if submitted:
-    if site_name and postcode and consumption > 0:
-        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-        if not ldz:  # This catches both None and empty string
-            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
-        else:
-            # Move all your existing code here (indent it one more level)
-            new_row = {
-                "Site Name": site_name.strip(),
-                "Post Code": postcode.strip(),
-                "Annual KWH": consumption
-            }
+        if site_name and postcode and consumption > 0:
+            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+            if not ldz:  # This catches both None and empty string
+                st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+            else:
+                new_row = {
+                    "Site Name": site_name.strip(),
+                    "Post Code": postcode.strip(),
+                    "Annual KWH": consumption
+                }
 
-            for d in [12, 24, 36]:
-                base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-                new_row.update({
-                    f"Base Standing Charge ({d}m)": round(base_sc, 2),
-                    f"Base Unit Rate ({d}m)": round(base_unit, 3),
-                    f"Standing Charge Uplift ({d}m)": 0,
-                    f"Uplift Unit Rate ({d}m)": 0,
-                    f"TAC £({d}m)": 0,
-                    f"Margin £({d}m)": 0
-                })
+                for d in [12, 24, 36]:
+                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                    new_row.update({
+                        f"Base Standing Charge ({d}m)": round(base_sc, 2),
+                        f"Base Unit Rate ({d}m)": round(base_unit, 3),
+                        f"Standing Charge Uplift ({d}m)": 0,
+                        f"Uplift Unit Rate ({d}m)": 0,
+                        f"TAC £({d}m)": 0,
+                        f"Margin £({d}m)": 0
+                    })
 
-            st.session_state.input_df = pd.concat([
-                st.session_state.input_df,
-                pd.DataFrame([new_row])
-            ], ignore_index=True)
+                st.session_state.input_df = pd.concat([
+                    st.session_state.input_df,
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
     
