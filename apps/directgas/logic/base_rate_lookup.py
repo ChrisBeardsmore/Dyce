@@ -19,7 +19,7 @@ def get_base_rates(ldz: str, kwh: float, duration: int, carbon_offset_required: 
     """Match a quote row and return best Standing Charge and Unit Rate."""
     # Filter flat file for rows matching LDZ, duration, carbon setting, and usage band
     match = flat_df[
-        (flat_df["Exit_Zone"] == ldz) &
+        (flat_df["LDZ"] == ldz) &
         (flat_df["Contract_Duration"] == duration) &
         (flat_df["Minimum_Annual_Consumption"] <= kwh) &
         (flat_df["Maximum_Annual_Consumption"] >= kwh) &
