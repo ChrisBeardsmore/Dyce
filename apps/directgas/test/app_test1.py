@@ -200,21 +200,21 @@ if uploaded_file:
     )
 
     # -----------------------------------------
-# Step 5: Calculate All Values (Base Rates + TAC + Margin) - FIXED
-# -----------------------------------------
-preview_df = edited_df.copy()
-for i, row in edited_df.iterrows():
-    postcode = str(row.get("Post Code", "") or "").strip()
-    try:
-        kwh = float(row.get("Annual KWH", 0) or 0)
-    except (ValueError, TypeError):
-        continue
-    if not postcode or kwh <= 0:
-        continue
-    
-    ldz = match_postcode_to_ldz(postcode, ldz_df)
-    
-    for duration in [12, 24, 36]:
+    # Step 5: Calculate All Values (Base Rates + TAC + Margin) - FIXED
+    # -----------------------------------------
+    preview_df = edited_df.copy()
+    for i, row in edited_df.iterrows():
+        postcode = str(row.get("Post Code", "") or "").strip()
+        try:
+            kwh = float(row.get("Annual KWH", 0) or 0)
+        except (ValueError, TypeError):
+            continue
+        if not postcode or kwh <= 0:
+            continue
+        
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        
+        for duration in [12, 24, 36]:
         # Get base rates from supplier file
         base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
         
