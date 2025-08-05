@@ -104,7 +104,7 @@ if uploaded_file:
             ], ignore_index=True)
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
-  
+    
 
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
@@ -183,3 +183,6 @@ if uploaded_file:
             file_name=f"{output_filename}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+else:
+    st.info("📁 Please upload a supplier flat file to begin creating quotes.")
