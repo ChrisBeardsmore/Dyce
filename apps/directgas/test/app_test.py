@@ -82,7 +82,7 @@ if uploaded_file:
     if submitted:
         if site_name and postcode and consumption > 0:
             ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-            if not ldz:  # This catches both None and empty string
+            if not ldz:
                 st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
             else:
                 new_row = {
@@ -108,50 +108,47 @@ if uploaded_file:
                 ], ignore_index=True)
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
-    
 
     # -----------------------------------------
     # Step 4: Editable Input Grid Setup
     # -----------------------------------------
-st.subheader("Input Grid (Editable)")
+    st.subheader("Input Grid (Editable)")
 
-# Configure column types and validation
-column_config = {
-    "Annual KWH": st.column_config.NumberColumn(
-        "Annual KWH",
-        min_value=0,
-        step=1,
-        format="%.0f"
-    )
-}
+    column_config = {
+        "Annual KWH": st.column_config.NumberColumn(
+            "Annual KWH",
+            min_value=0,
+            step=1,
+            format="%.0f"
+        )
+    }
 
-# Add configurations for uplift columns
-for duration in [12, 24, 36]:
-    column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
-        f"SC Uplift ({duration}m)",
-        min_value=0,
-        max_value=100.0,
-        step=0.01,
-        format="%.2f",
-        help="Max 100p/day"
+    for duration in [12, 24, 36]:
+        column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
+            f"SC Uplift ({duration}m)",
+            min_value=0,
+            max_value=100.0,
+            step=0.01,
+            format="%.2f",
+            help="Max 100p/day"
+        )
+        column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+            f"Unit Uplift ({duration}m)",
+            min_value=0,
+            max_value=3.000,
+            step=0.001,
+            format="%.3f",
+            help="Max 3.000p/kWh"
+        )
+
+    edited_df = st.data_editor(
+        st.session_state.input_df,
+        use_container_width=True,
+        num_rows="dynamic",
+        hide_index=True,
+        column_config=column_config,
+        disabled=[]
     )
-    column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-        f"Unit Uplift ({duration}m)", 
-        min_value=0,
-        max_value=3.000,
-        step=0.001,
-        format="%.3f",
-        help="Max 3.000p/kWh"
-    )
-edited_df = st.data_editor(
-    st.session_state.input_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    hide_index=True,
-    column_config=column_config,
-    disabled=[]
-)
-    
 
     # -----------------------------------------
     # Step 5: Inject Base Rates Back into Editable Grid
@@ -161,17 +158,17 @@ edited_df = st.data_editor(
         postcode = row.get("Post Code", "")
         try:
             kwh = float(row.get("Annual KWH", 0))
-    except (ValueError, TypeError):
-        continue
-    if not postcode or kwh <= 0:
-        continue
-    ldz = match_postcode_to_ldz(postcode, ldz_df)
-    for duration in [12, 24, 36]:
-        base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-        preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-        preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+        except (ValueError, TypeError):
+            continue
+        if not postcode or kwh <= 0:
+            continue
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        for duration in [12, 24, 36]:
+            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
 
-     edited_df = preview_df
+    edited_df = preview_df
 
     # -----------------------------------------
     # Step 6: Calculate TAC & Margin Values
@@ -212,6 +209,12 @@ edited_df = st.data_editor(
                       [f"TAC £({d}m)" for d in [12, 24, 36]] + \
                       [f"Margin £({d}m)" for d in [12, 24, 36]]
         st.dataframe(output_df[output_cols], use_container_width=True)
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            output_df.to_excel(writer, index=False)
+        output.seek(0)
+
         st.download_button(
             label="Download Quote Output",
             data=output,
