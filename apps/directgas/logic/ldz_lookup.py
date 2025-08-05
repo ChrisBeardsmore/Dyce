@@ -39,9 +39,6 @@ def match_postcode_to_ldz(postcode: str, ldz_df: pd.DataFrame) -> str:
     """Match a postcode to its corresponding LDZ region."""
     postcode = postcode.replace(" ", "").upper()
     
-def match_postcode_to_ldz(postcode: str, ldz_df: pd.DataFrame) -> str:
-    """Match a postcode to its corresponding LDZ region."""
-    postcode = postcode.replace(" ", "").upper()
     
     # Debug: Show what we're working with
     st.write(f"🔍 Debug: Looking for postcode: {postcode}")
