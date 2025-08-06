@@ -53,6 +53,47 @@ bands = [
     (225001, 300000)
 ]
 
+# Step 5A: Load or Save Uplift Config
+import json
+from utils.config_handler import load_uplift_config  # You must have this file in /utils/
+
+st.header("Step 5A: Load or Save Uplift Config")
+
+uploaded_config = st.file_uploader("Load Existing Uplift Config (.json)", type=["json"])
+uplift_inputs = []
+
+if uploaded_config:
+    loaded_config = load_uplift_config(uploaded_config)
+    uplift_inputs = loaded_config["bands"]
+    st.success(f"Loaded config: {loaded_config['name']} ({loaded_config['date']})")
+else:
+    for idx, (min_val, max_val) in enumerate(bands):
+        uplift_inputs.append({
+            "min": min_val,
+            "max": max_val,
+            "uplift_standing": 0.0,
+            "uplift_day": 0.0,
+            "uplift_night": 0.0,
+            "uplift_evw": 0.0
+        })
+
+with st.expander("💾 Save Current Uplift Config", expanded=False):
+    config_name = st.text_input("Name this uplift version", value="Sep24_Sculpted")
+    config_notes = st.text_area("Notes", value="Trial pricing for September")
+    if st.button("Download Config as JSON"):
+        config_dict = {
+            "name": config_name,
+            "date": str(pd.Timestamp.today().date()),
+            "notes": config_notes,
+            "bands": uplift_inputs
+        }
+        st.download_button(
+            label="Download JSON",
+            data=json.dumps(config_dict, indent=2),
+            file_name=f"{config_name}.json",
+            mime="application/json"
+        )
+
 uplift_inputs = []
 
 for idx, (min_val, max_val) in enumerate(bands):
