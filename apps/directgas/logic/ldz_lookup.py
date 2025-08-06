@@ -15,10 +15,11 @@ import streamlit as st
 #   - pd.DataFrame: Cleaned LDZ reference table with uppercased, space-stripped postcodes
 # -----------------------------------------
 def load_ldz_data() -> pd.DataFrame:
-    """Fetch LDZ mapping data from remote CSV and clean postcode column."""
-    url = "https://raw.githubusercontent.com/ChrisBeardsmore/Gas-Pricing/main/postcode_ldz_full.csv"
+    """Load LDZ mapping data from local CSV and clean postcode column."""
+    file_path = "apps/directgas/data/postcode_ldz_full.csv"
     
-    df = pd.read_csv(url)
+    df = pd.read_csv(file_path)  # <-- Use local file instead
+    
     # Standardise postcodes: uppercase and remove spaces
     df["Postcode"] = df["Postcode"].astype(str).str.upper().str.replace(r"\s+", "", regex=True)
     
