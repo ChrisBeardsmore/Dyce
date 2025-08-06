@@ -156,6 +156,10 @@ if uploaded_file:
         )
 
     # Show data editor and capture changes
+    # Ensure session state exists before accessing it
+    if "input_df" not in st.session_state:
+        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+    
     edited_df = st.data_editor(
         st.session_state.input_df,
         use_container_width=True,
