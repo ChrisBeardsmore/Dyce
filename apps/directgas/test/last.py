@@ -91,6 +91,34 @@ if uploaded_file:
                 st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
             else:
                 new_row = {
+    "MPXN": site_name.strip(),
+    "Post Code": postcode.strip(),
+    "Annual Consumption KWh": consumption
+}
+
+# Clear all previous keys to prevent accidental duplicates
+all_keys = []
+
+for d in [12, 24, 36]:
+    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+    base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+    
+    keys = {
+        f"Standing Charge (Base {d}m)": round(base_sc, 2),
+        f"Unit Rate (Base {d}m)": round(base_unit, 3),
+        f"Standing Charge (uplift {d}m)": 0.00,
+        f"Unit Rate (Uplift {d}m)": 0.000,
+        f"Sell Standing Charge ({d}m)": round(base_sc, 2),
+        f"Sell Unit Rate ({d}m)": round(base_unit, 3),
+        f"TAC ({d}m)": base_tac,
+        f"Margin £({d}m)": 0.00
+    }
+    new_row.update(keys)
+    all_keys.extend(keys.keys())
+
+# Optional: check for duplicates
+if len(all_keys) != len(set(all_keys)):
+    st.error("❌ Duplicate column keys found while building new row. Please review.")new_row = {
                     "MPXN": site_name.strip(),
                     "Post Code": postcode.strip(),
                     "Annual Consumption KWh": consumption
