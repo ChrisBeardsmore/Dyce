@@ -3,40 +3,56 @@ import pandas as pd
 import io
 from logic import generate_price_book
 
+# Step 0: Page Setup
 st.set_page_config(layout="wide")
-st.title("NHH Pricing Tool with Manual Cost Allocation")
+st.title("⚡ NHH Pricing Tool – Manual Cost Allocation")
 
+# Step 1: Upload Flat File
 uploaded_file = st.file_uploader("Upload the Flat File (.xlsx)", type=["xlsx"])
-
 if uploaded_file is None:
     st.warning("Please upload the flat file to start.")
     st.stop()
 
 df = pd.read_excel(uploaded_file)
-st.write("Flat file loaded successfully. Preview:")
+st.success("Flat file loaded successfully.")
 st.dataframe(df.head())
 
+# Step 2: Select Tariff and Contract Duration
+st.header("Step 2: Contract Settings")
 green_option = st.selectbox("Select Tariff Type:", options=["Standard", "Green"])
 contract_duration = st.selectbox("Select Contract Duration (Months):", options=[12, 24, 36])
 
-st.subheader("Manual Cost Allocation")
+# Step 3: Manual Cost Allocation
+st.header("Step 3: Manual Cost Allocation")
 total_cost_input = st.number_input("Enter Total Cost per Meter (£/year)", value=120.0, step=1.0)
 cost_split_slider = st.slider("Allocate Cost to Standing Charge (%)", min_value=0, max_value=100, value=50)
 
-st.subheader("Consumption Profile Split (%)")
+# Step 4: Set Consumption Profile Split
+st.header("Step 4: Consumption Profile Split (%)")
 col_day, col_night, col_evw = st.columns(3)
 day_pct = col_day.slider("Day (%)", min_value=0, max_value=100, value=70)
 night_pct = col_night.slider("Night (%)", min_value=0, max_value=100, value=20)
 evw_pct = col_evw.slider("Evening & Weekend (%)", min_value=0, max_value=100, value=10)
 
-if day_pct + night_pct + evw_pct != 100:
+profile_total = day_pct + night_pct + evw_pct
+if profile_total != 100:
     st.error("The total profile split must equal 100%.")
     st.stop()
 
 profile_split = {"day": day_pct, "night": night_pct, "evw": evw_pct}
 
-st.subheader("Uplifts per Consumption Band")
-bands = [(1000, 3000), (3001, 12500), (12501, 26000), (26001, 100000), (100001, 175000), (175001, 225000), (225001, 300000)]
+# Step 5: Set Uplifts per Consumption Band
+st.header("Step 5: Uplifts per Consumption Band")
+bands = [
+    (1000, 3000),
+    (3001, 12500),
+    (12501, 26000),
+    (26001, 100000),
+    (100001, 175000),
+    (175001, 225000),
+    (225001, 300000)
+]
+
 uplift_inputs = []
 
 for idx, (min_val, max_val) in enumerate(bands):
@@ -51,6 +67,8 @@ for idx, (min_val, max_val) in enumerate(bands):
         "uplift_evw": cols[3].number_input(f"E/W Uplift (p/kWh) - Band {idx+1}", value=0.0, step=0.1, key=f"evw_{idx}")
     })
 
+# Step 6: Generate and Download Excel Price Book
+st.header("Step 6: Generate Excel Price Book")
 report_title = st.text_input("Enter Report Filename (without .xlsx):", value="nhh_price_book")
 
 if st.button("Generate Excel Price Book"):
@@ -77,4 +95,3 @@ if st.button("Generate Excel Price Book"):
         data=output.getvalue(),
         file_name=f"{report_title}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
