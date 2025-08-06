@@ -30,23 +30,21 @@ from directgas.logic.input_setup import create_input_dataframe
 # OPTIMIZED FUNCTIONS WITH CACHING
 # -----------------------------------------
 
-@st.cache_data
-def cached_ldz_lookup(postcode: str, _ldz_df) -> str:
-    """Cached postcode to LDZ lookup - no debug spam."""
+def cached_ldz_lookup(postcode: str, ldz_df) -> str:
+    """Clean LDZ lookup - no debug spam."""
     postcode = postcode.replace(" ", "").upper()
     
     # Try longest-to-shortest prefix match
     for length in [7, 6, 5, 4, 3]:
-        match = _ldz_df[_ldz_df["Postcode"].str.startswith(postcode[:length])]
+        match = ldz_df[ldz_df["Postcode"].str.startswith(postcode[:length])]
         if not match.empty:
             return match.iloc[0]["LDZ"]
     
     return ""
 
-@st.cache_data
-def cached_base_rates(ldz: str, kwh: float, duration: int, carbon_offset_required: bool, _flat_df) -> tuple[float, float]:
-    """Cached base rate lookup to avoid repeated file searches."""
-    return get_base_rates(ldz, kwh, duration, carbon_offset_required, _flat_df)
+def cached_base_rates(ldz: str, kwh: float, duration: int, carbon_offset_required: bool, flat_df) -> tuple[float, float]:
+    """Clean base rate lookup."""
+    return get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
 
 def calculate_row_hash(row_data: dict) -> str:
     """Generate hash of row data to detect changes."""
