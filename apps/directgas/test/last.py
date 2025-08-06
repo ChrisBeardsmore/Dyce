@@ -73,9 +73,9 @@ if uploaded_file:
 
     with st.form("add_site_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
-        with col1:
-            site_name = st.text_input("MPXN")
-            mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+      with col1:
+    site_name = st.text_input("Site Name")
+    mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
         with col2:
             postcode = st.text_input("Post Code")
             try:
