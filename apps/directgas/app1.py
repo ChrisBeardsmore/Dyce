@@ -44,10 +44,12 @@ ldz_df = load_ldz_data()
 # -----------------------------------------
 # Step 2: Upload Supplier Flat File
 # -----------------------------------------
-uploaded_file = st.file_uploader("Upload Supplier Flat File (XLSX)", type=["xlsx"])
-
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
+
+    # Initialize session state for input dataframe (ADD THIS BLOCK)
+    if "input_df" not in st.session_state:
+        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
     # -----------------------------------------
     # Step 3: Quote Configuration Inputs
@@ -63,8 +65,11 @@ if uploaded_file:
     # -----------------------------------------
     st.subheader("🔹 Add Sites to Quote")
 
-    if "input_df" not in st.session_state:
-        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+    # REMOVE THIS BLOCK (it was duplicated):
+    # if "input_df" not in st.session_state:
+    #     st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+
+    # ... rest of the code continues as normal
 
     with st.form("add_site_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
