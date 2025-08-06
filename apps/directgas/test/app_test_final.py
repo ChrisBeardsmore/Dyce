@@ -27,11 +27,17 @@ from directgas.logic.flat_file_loader import load_flat_file
 from directgas.logic.input_setup import create_input_dataframe
 
 # -----------------------------------------
-# OPTIMIZED FUNCTIONS WITH CACHING
+# OPTIMIZED FUNCTIONS WITH SMART CACHING
 # -----------------------------------------
 
-def cached_ldz_lookup(postcode: str, ldz_df) -> str:
-    """Clean LDZ lookup - no debug spam."""
+@st.cache_data
+def cached_ldz_lookup(postcode: str) -> str:
+    """Cached postcode to LDZ lookup - no debug spam."""
+    # Load LDZ data inside the cached function
+    url = "https://raw.githubusercontent.com/ChrisBeardsmore/Gas-Pricing/main/postcode_ldz_full.csv"
+    ldz_df = pd.read_csv(url)
+    ldz_df["Postcode"] = ldz_df["Postcode"].astype(str).str.upper().str.replace(r"\s+", "", regex=True)
+    
     postcode = postcode.replace(" ", "").upper()
     
     # Try longest-to-shortest prefix match
@@ -43,7 +49,7 @@ def cached_ldz_lookup(postcode: str, ldz_df) -> str:
     return ""
 
 def cached_base_rates(ldz: str, kwh: float, duration: int, carbon_offset_required: bool, flat_df) -> tuple[float, float]:
-    """Clean base rate lookup."""
+    """Clean base rate lookup - no caching (file too big)."""
     return get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
 
 def calculate_row_hash(row_data: dict) -> str:
@@ -88,11 +94,11 @@ def smart_recalculate(edited_df: pd.DataFrame, flat_df: pd.DataFrame, ldz_df: pd
         if not postcode or kwh <= 0:
             continue
         
-        # Use cached lookups
-        ldz = cached_ldz_lookup(postcode, ldz_df)
+        # Use cached LDZ lookup
+        ldz = cached_ldz_lookup(postcode)
         
         for duration in [12, 24, 36]:
-            # Get cached base rates
+            # Get cached base rates (no caching, but clean lookup)
             base_sc, base_unit = cached_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
             
             # Get user uplifts with proper type conversion
@@ -162,18 +168,10 @@ if uploaded_file:
     # -----------------------------------------
     st.subheader("Quote Configuration")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        customer_name = st.text_input("Customer Name")
-        product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
-        carbon_offset_required = product_type == "Carbon Off"
-    with col2:
-        output_filename = st.text_input("Output file name", value="dyce_quote")
-        calculation_mode = st.radio(
-            "Calculation Mode",
-            ["Auto (Real-time)", "Manual (Button)"],
-            help="Auto: Recalculates as you type. Manual: Click button to recalculate."
-        )
+    customer_name = st.text_input("Customer Name")
+    product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
+    carbon_offset_required = product_type == "Carbon Off"
+    output_filename = st.text_input("Output file name", value="dyce_quote")
     
     if st.button("🔄 Reset All Data"):
         st.session_state.clear()
@@ -198,7 +196,7 @@ if uploaded_file:
         submitted = st.form_submit_button("➕ Add Site")
 
     if submitted and site_name and postcode and consumption > 0:
-        ldz = cached_ldz_lookup(postcode.strip(), ldz_df)
+        ldz = cached_ldz_lookup(postcode.strip())
         if not ldz:
             st.error(f"❌ Postcode '{postcode}' not found in LDZ database.")
         else:
@@ -237,31 +235,33 @@ if uploaded_file:
 
     # Column configuration
     column_config = {
-        "Annual KWH": st.column_config.NumberColumn("Annual KWH", min_value=0, step=1, format="%.0f")
+        "Site Name": st.column_config.TextColumn("MPXN", help="Site identifier"),
+        "Post Code": st.column_config.TextColumn("Post Code"),
+        "Annual KWH": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f")
     }
 
     for duration in [12, 24, 36]:
         column_config.update({
-            f"Standing Charge Uplift ({duration}m)": st.column_config.NumberColumn(
-                f"SC+ ({duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
-            ),
-            f"Uplift Unit Rate ({duration}m)": st.column_config.NumberColumn(
-                f"Unit+ ({duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
-            ),
             f"Base Standing Charge ({duration}m)": st.column_config.NumberColumn(
-                f"Base SC ({duration}m)", format="%.2f", disabled=True
+                f"Standing Charge (Base {duration}m)", format="%.2f", disabled=True
             ),
             f"Base Unit Rate ({duration}m)": st.column_config.NumberColumn(
-                f"Base Unit ({duration}m)", format="%.3f", disabled=True
+                f"Unit Rate (Base {duration}m)", format="%.3f", disabled=True
+            ),
+            f"Standing Charge Uplift ({duration}m)": st.column_config.NumberColumn(
+                f"Standing Charge (Uplift {duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
+            ),
+            f"Uplift Unit Rate ({duration}m)": st.column_config.NumberColumn(
+                f"Unit Rate (Uplift {duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
             ),
             f"Final Standing Charge ({duration}m)": st.column_config.NumberColumn(
-                f"Final SC ({duration}m)", format="%.2f", disabled=True
+                f"Sell Standing Charge ({duration}m)", format="%.2f", disabled=True
             ),
             f"Final Unit Rate ({duration}m)": st.column_config.NumberColumn(
-                f"Final Unit ({duration}m)", format="%.3f", disabled=True
+                f"Sell Unit Rate ({duration}m)", format="%.3f", disabled=True
             ),
             f"TAC £({duration}m)": st.column_config.NumberColumn(
-                f"TAC £({duration}m)", format="£%.2f", disabled=True
+                f"TAC ({duration}m)", format="£%.2f", disabled=True
             ),
             f"Margin £({duration}m)": st.column_config.NumberColumn(
                 f"Margin £({duration}m)", format="£%.2f", disabled=True
@@ -279,18 +279,11 @@ if uploaded_file:
     )
 
     # -----------------------------------------
-    # Step 5: Smart Recalculation
+    # Step 5: Smart Recalculation (Auto Mode Only)
     # -----------------------------------------
-    if calculation_mode == "Manual (Button)":
-        if st.button("🔄 Recalculate All", type="primary"):
-            # Force recalculation of all rows
-            st.session_state.row_hashes = {}  # Clear hash cache
-            updated_df = smart_recalculate(edited_df, flat_df, ldz_df, carbon_offset_required)
-            st.session_state.input_df = updated_df
-    else:
-        # Auto mode - smart recalculation
-        updated_df = smart_recalculate(edited_df, flat_df, ldz_df, carbon_offset_required)
-        st.session_state.input_df = updated_df
+    # Auto mode - smart recalculation
+    updated_df = smart_recalculate(edited_df, flat_df, ldz_df, carbon_offset_required)
+    st.session_state.input_df = updated_df
 
     # -----------------------------------------
     # Step 6: Customer Quote Preview
