@@ -1,5 +1,5 @@
 # -----------------------------------------
-# File: app_test.py
+# File: app_test1.py
 # Purpose: Streamlit test frontend for Dyce's multi-site gas quote builder
 # Dependencies: logic modules from /apps/directgas/logic/
 # -----------------------------------------
@@ -44,10 +44,12 @@ ldz_df = load_ldz_data()
 # -----------------------------------------
 # Step 2: Upload Supplier Flat File
 # -----------------------------------------
+uploaded_file = st.file_uploader("Upload Supplier Flat File (XLSX)", type=["xlsx"])
+
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
 
-    # Initialize session state for input dataframe (ADD THIS BLOCK)
+    # Initialize session state immediately after file load
     if "input_df" not in st.session_state:
         st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
@@ -59,17 +61,15 @@ if uploaded_file:
     product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
     carbon_offset_required = product_type == "Carbon Off"
     output_filename = st.text_input("Output file name", value="dyce_quote")
+    
+    if st.button("🔄 Reset All Data (Clear Session)"):
+        st.session_state.clear()
+        st.rerun()
 
     # -----------------------------------------
     # Step 3B: Add Sites via Input Form
     # -----------------------------------------
     st.subheader("🔹 Add Sites to Quote")
-
-    # REMOVE THIS BLOCK (it was duplicated):
-    # if "input_df" not in st.session_state:
-    #     st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
-
-    # ... rest of the code continues as normal
 
     with st.form("add_site_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -98,6 +98,8 @@ if uploaded_file:
 
                 for d in [12, 24, 36]:
                     base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                    base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+                    
                     new_row.update({
                         f"Base Standing Charge ({d}m)": round(base_sc, 2),
                         f"Base Unit Rate ({d}m)": round(base_unit, 3),
@@ -105,7 +107,7 @@ if uploaded_file:
                         f"Uplift Unit Rate ({d}m)": 0,
                         f"Final Standing Charge ({d}m)": round(base_sc, 2),
                         f"Final Unit Rate ({d}m)": round(base_unit, 3),
-                        f"TAC £({d}m)": round((base_sc * 365 + base_unit * consumption) / 100, 2),
+                        f"TAC £({d}m)": base_tac,
                         f"Margin £({d}m)": 0
                     })
 
@@ -133,6 +135,7 @@ if uploaded_file:
         column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
             f"Unit Uplift ({duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
         )
+        # Read-only calculated fields for agent reference
         column_config[f"Base Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
             f"Base SC ({duration}m)", format="%.2f", disabled=True, help="Base rate from supplier (p/day)"
         )
@@ -152,7 +155,7 @@ if uploaded_file:
             f"Margin £({duration}m)", format="£%.2f", disabled=True, help="Dyce profit margin"
         )
 
-    # Show editable grid
+    # Show data editor and capture changes
     edited_df = st.data_editor(
         st.session_state.input_df,
         use_container_width=True,
@@ -162,77 +165,97 @@ if uploaded_file:
         key="agent_grid"
     )
 
-    # Apply real-time calculations
-    calculated_df = edited_df.copy()
+    # -----------------------------------------
+    # Step 5: Real-time Calculation Update
+    # -----------------------------------------
+    # Calculate all values in real-time
+    updated_df = edited_df.copy()
 
     for i, row in edited_df.iterrows():
         postcode = str(row.get("Post Code", "") or "").strip()
+        
         try:
             kwh = float(row.get("Annual KWH", 0) or 0)
         except (ValueError, TypeError):
             kwh = 0.0
-
+        
         if not postcode or kwh <= 0:
             continue
-
+        
         ldz = match_postcode_to_ldz(postcode, ldz_df)
-
+        
         for duration in [12, 24, 36]:
+            # Get base rates from supplier file
             base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+            
+            # Get user uplifts with proper type conversion
             try:
                 uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
                 uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
             except (ValueError, TypeError):
                 uplift_sc = 0.0
                 uplift_unit = 0.0
-
+            
+            # Calculate final values
             final_sc = base_sc + uplift_sc
             final_unit = base_unit + uplift_unit
             sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+            
+            # Update calculated dataframe
+            updated_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+            updated_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+            updated_df.at[i, f"Final Standing Charge ({duration}m)"] = round(final_sc, 2)
+            updated_df.at[i, f"Final Unit Rate ({duration}m)"] = round(final_unit, 3)
+            updated_df.at[i, f"TAC £({duration}m)"] = sell_tac
+            updated_df.at[i, f"Margin £({duration}m)"] = margin
 
-            calculated_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            calculated_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-            calculated_df.at[i, f"Final Standing Charge ({duration}m)"] = round(final_sc, 2)
-            calculated_df.at[i, f"Final Unit Rate ({duration}m)"] = round(final_unit, 3)
-            calculated_df.at[i, f"TAC £({duration}m)"] = sell_tac
-            calculated_df.at[i, f"Margin £({duration}m)"] = margin
+    # Update session state with calculated values
+    st.session_state.input_df = updated_df
 
-    st.session_state.input_df = calculated_df
+    # Debug info (remove this after testing)
+    if st.checkbox("Show Debug Info"):
+        if not updated_df.empty:
+            test_row = updated_df.iloc[0]
+            st.write("Debug - First Row Values:")
+            st.write(f"Unit Uplift (12m): {test_row.get('Uplift Unit Rate (12m)', 'NOT FOUND')}")
+            st.write(f"Base Unit (12m): {test_row.get('Base Unit Rate (12m)', 'NOT FOUND')}")
+            st.write(f"Final Unit (12m): {test_row.get('Final Unit Rate (12m)', 'NOT FOUND')}")
 
     # -----------------------------------------
-    # Step 5: Customer Quote Preview (Display Only)
+    # Step 6: Customer Quote Preview (Display Only)
     # -----------------------------------------
     st.subheader("Customer Quote Preview")
 
+    # Filter out empty rows for preview
     preview_rows = []
-    for _, row in calculated_df.iterrows():
+    for _, row in updated_df.iterrows():
         site = str(row.get("Site Name", "") or "").strip()
         postcode = str(row.get("Post Code", "") or "").strip()
         try:
             kwh = float(row.get("Annual KWH", 0) or 0)
         except (ValueError, TypeError):
             kwh = 0.0
-
-        if site and postcode and kwh > 0:
+        
+        if site and postcode and kwh > 0:  # Only include completed rows
             preview_data = {
                 "Site Name": site,
                 "Post Code": postcode,
                 "Annual KWH": kwh
             }
-
+            # Add customer-facing pricing (final rates and TAC only)
             for duration in [12, 24, 36]:
                 preview_data[f"Standing Charge ({duration}m)"] = f"{row.get(f'Final Standing Charge ({duration}m)', 0):.2f}p"
                 preview_data[f"Unit Rate ({duration}m)"] = f"{row.get(f'Final Unit Rate ({duration}m)', 0):.3f}p"
                 preview_data[f"Annual Cost ({duration}m)"] = f"£{row.get(f'TAC £({duration}m)', 0):.2f}"
-
+            
             preview_rows.append(preview_data)
 
     if preview_rows:
         preview_df = pd.DataFrame(preview_rows)
         st.dataframe(preview_df, use_container_width=True, hide_index=True)
-
+        
         # -----------------------------------------
-        # Step 6: Export Customer Quote
+        # Step 7: Export Customer Quote
         # -----------------------------------------
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -247,3 +270,6 @@ if uploaded_file:
         )
     else:
         st.info("👆 Add sites above to see customer quote preview")
+
+else:
+    st.info("📁 Please upload a supplier flat file to begin creating quotes.")
