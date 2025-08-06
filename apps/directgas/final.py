@@ -15,11 +15,11 @@ from PIL import Image
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
 
 # Import core logic modules
-from directgas.logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
-from directgas.logic.base_rate_lookup import get_base_rates
-from directgas.logic.tac_calculator import calculate_tac_and_margin
-from directgas.logic.flat_file_loader import load_flat_file
-from directgas.logic.input_setup import create_input_dataframe
+from logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
+from logic.base_rate_lookup import get_base_rates
+from logic.tac_calculator import calculate_tac_and_margin
+from logic.flat_file_loader import load_flat_file
+from logic.input_setup import create_input_dataframe
 
 # -----------------------------------------
 # UI Setup: Page settings and branding
