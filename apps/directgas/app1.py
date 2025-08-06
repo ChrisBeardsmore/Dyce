@@ -112,185 +112,143 @@ if uploaded_file:
         else:
             st.warning("Please enter valid Site Name, Post Code, and KWH.")
 
-    # -----------------------------------------
-    # Step 4: Editable Input Grid Setup
-    # -----------------------------------------
-    st.subheader("Input Grid (Editable)")
+   # -----------------------------------------
+# Step 4: Agent Input Grid (All Calculations Happen Here)
+# -----------------------------------------
+st.subheader("Agent Input Grid")
 
-    # Configure column types and validation
-    column_config = {
-        "Annual KWH": st.column_config.NumberColumn(
-            "Annual KWH",
-            min_value=0,
-            step=1,
-            format="%.0f"
-        )
-    }
+# Configure column types and validation
+column_config = {
+    "Annual KWH": st.column_config.NumberColumn("Annual KWH", min_value=0, step=1, format="%.0f")
+}
 
-    # Add configurations for uplift columns (editable)
-    for duration in [12, 24, 36]:
-        column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
-            f"SC Uplift ({duration}m)",
-            min_value=0,
-            max_value=100.0,
-            step=0.01,
-            format="%.2f",
-            help="Max 100p/day"
-        )
-        column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Unit Uplift ({duration}m)",
-            min_value=0,
-            max_value=3.000,
-            step=0.001,
-            format="%.3f",
-            help="Max 3.000p/kWh"
-        )
-
-    # Add configurations for calculated fields (read-only)
-    for duration in [12, 24, 36]:
-        column_config[f"Base Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
-            f"Base SC ({duration}m)",
-            format="%.2f",
-            disabled=True,
-            help="Base rate from supplier (p/day)"
-        )
-        column_config[f"Base Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Base Unit ({duration}m)",
-            format="%.3f",
-            disabled=True,
-            help="Base rate from supplier (p/kWh)"
-        )
-        column_config[f"Final Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
-            f"Final SC ({duration}m)",
-            format="%.2f",
-            disabled=True,
-            help="Base + Uplift (p/day)"
-        )
-        column_config[f"Final Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-            f"Final Unit ({duration}m)",
-            format="%.3f", 
-            disabled=True,
-            help="Base + Uplift (p/kWh)"
-        )
-        column_config[f"TAC £({duration}m)"] = st.column_config.NumberColumn(
-            f"TAC £({duration}m)",
-            format="£%.2f",
-            disabled=True,
-            help="Total Annual Cost"
-        )
-        column_config[f"Margin £({duration}m)"] = st.column_config.NumberColumn(
-            f"Margin £({duration}m)",
-            format="£%.2f",
-            disabled=True,
-            help="Dyce profit margin"
-        )
-
-    edited_df = st.data_editor(
-        st.session_state.input_df,
-        use_container_width=True,
-        num_rows="dynamic",
-        hide_index=True,
-        column_config=column_config,
-        disabled=[]
+for duration in [12, 24, 36]:
+    column_config[f"Standing Charge Uplift ({duration}m)"] = st.column_config.NumberColumn(
+        f"SC Uplift ({duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
+    )
+    column_config[f"Uplift Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+        f"Unit Uplift ({duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
+    )
+    # Read-only calculated fields for agent reference
+    column_config[f"Base Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
+        f"Base SC ({duration}m)", format="%.2f", disabled=True, help="Base rate from supplier (p/day)"
+    )
+    column_config[f"Base Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+        f"Base Unit ({duration}m)", format="%.3f", disabled=True, help="Base rate from supplier (p/kWh)"
+    )
+    column_config[f"Final Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
+        f"Final SC ({duration}m)", format="%.2f", disabled=True, help="Base + Uplift (p/day)"
+    )
+    column_config[f"Final Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+        f"Final Unit ({duration}m)", format="%.3f", disabled=True, help="Base + Uplift (p/kWh)"
+    )
+    column_config[f"TAC £({duration}m)"] = st.column_config.NumberColumn(
+        f"TAC £({duration}m)", format="£%.2f", disabled=True, help="Total Annual Cost"
+    )
+    column_config[f"Margin £({duration}m)"] = st.column_config.NumberColumn(
+        f"Margin £({duration}m)", format="£%.2f", disabled=True, help="Dyce profit margin"
     )
 
-    # -----------------------------------------
-    # Step 5: Calculate All Values (Base Rates + TAC + Margin)
-    # -----------------------------------------
-    preview_df = edited_df.copy()
-    for i, row in edited_df.iterrows():
-        postcode = row.get("Post Code", "")
-        try:
-            kwh = float(row.get("Annual KWH", 0))
-        except (ValueError, TypeError):
-            continue
-        if not postcode or kwh <= 0:
-            continue
-        
-        ldz = match_postcode_to_ldz(postcode, ldz_df)
-        
-        for duration in [12, 24, 36]:
-            # Get base rates from supplier file
-            base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
-            
-            # Get uplift values from user input
-            uplift_sc = row.get(f"Standing Charge Uplift ({duration}m)", 0)
-            uplift_unit = row.get(f"Uplift Unit Rate ({duration}m)", 0)
-            
-            # Calculate final customer rates (base + uplift)
-            final_sc = base_sc + uplift_sc
-            final_unit = base_unit + uplift_unit
-            
-            # Calculate TAC and margin
-            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-            
-            # Update all calculated fields in the grid
-            preview_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
-            preview_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
-            preview_df.at[i, f"Final Standing Charge ({duration}m)"] = round(final_sc, 2)
-            preview_df.at[i, f"Final Unit Rate ({duration}m)"] = round(final_unit, 3)
-            preview_df.at[i, f"TAC £({duration}m)"] = sell_tac
-            preview_df.at[i, f"Margin £({duration}m)"] = margin
+# Show data editor and capture changes
+edited_df = st.data_editor(
+    st.session_state.input_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    hide_index=True,
+    column_config=column_config,
+    key="agent_grid"
+)
 
-    edited_df = preview_df
+# Calculate all values in real-time
+calculated_df = edited_df.copy()
 
-    # -----------------------------------------
-    # Step 6: Prepare Customer-Facing Output Data
-    # -----------------------------------------
-    st.subheader("Customer Quote Preview")
+for i, row in edited_df.iterrows():
+    postcode = str(row.get("Post Code", "") or "").strip()
     
-    if not edited_df.empty:
-        customer_rows = []
-        for _, row in edited_df.iterrows():
-            site = row.get("Site Name", "").strip()
-            postcode = row.get("Post Code", "").strip()
-            try:
-                kwh = float(row.get("Annual KWH", 0))
-            except (ValueError, TypeError):
-                continue
-            if not postcode or kwh <= 0:
-                continue
-            
-            # Build customer-facing row
-            customer_data = {
-                "Site Name": site,
-                "Post Code": postcode,
-                "Annual KWH": kwh
-            }
-            
-            # Add final rates and TAC for each duration (customer view)
-            for duration in [12, 24, 36]:
-                customer_data[f"Standing Charge ({duration}m)"] = row.get(f"Final Standing Charge ({duration}m)", 0)
-                customer_data[f"Unit Rate ({duration}m)"] = row.get(f"Final Unit Rate ({duration}m)", 0)
-                customer_data[f"TAC £({duration}m)"] = row.get(f"TAC £({duration}m)", 0)
-            
-            customer_rows.append(customer_data)
+    try:
+        kwh = float(row.get("Annual KWH", 0) or 0)
+    except (ValueError, TypeError):
+        kwh = 0.0
+    
+    if not postcode or kwh <= 0:
+        continue
+    
+    ldz = match_postcode_to_ldz(postcode, ldz_df)
+    
+    for duration in [12, 24, 36]:
+        # Get base rates
+        base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df)
+        
+        # Get user uplifts with proper type conversion
+        try:
+            uplift_sc = float(row.get(f"Standing Charge Uplift ({duration}m)", 0) or 0)
+            uplift_unit = float(row.get(f"Uplift Unit Rate ({duration}m)", 0) or 0)
+        except (ValueError, TypeError):
+            uplift_sc = 0.0
+            uplift_unit = 0.0
+        
+        # Calculate final values
+        final_sc = base_sc + uplift_sc
+        final_unit = base_unit + uplift_unit
+        sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+        
+        # Update calculated dataframe
+        calculated_df.at[i, f"Base Standing Charge ({duration}m)"] = round(base_sc, 2)
+        calculated_df.at[i, f"Base Unit Rate ({duration}m)"] = round(base_unit, 3)
+        calculated_df.at[i, f"Final Standing Charge ({duration}m)"] = round(final_sc, 2)
+        calculated_df.at[i, f"Final Unit Rate ({duration}m)"] = round(final_unit, 3)
+        calculated_df.at[i, f"TAC £({duration}m)"] = sell_tac
+        calculated_df.at[i, f"Margin £({duration}m)"] = margin
 
-        # -----------------------------------------
-        # Step 7: Display Customer Output and Download
-        # -----------------------------------------
-        if customer_rows:
-            customer_df = pd.DataFrame(customer_rows)
-            
-            # Define customer-facing columns in the right order
-            customer_cols = ["Site Name", "Post Code", "Annual KWH"]
-            for d in [12, 24, 36]:
-                customer_cols += [f"Standing Charge ({d}m)", f"Unit Rate ({d}m)", f"TAC £({d}m)"]
-            
-            st.dataframe(customer_df[customer_cols], use_container_width=True)
+# Update session state
+st.session_state.input_df = calculated_df
 
-            # Create Excel download for customer
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                customer_df[customer_cols].to_excel(writer, index=False, sheet_name="Quote")
-            output.seek(0)
+# -----------------------------------------
+# Step 5: Customer Quote Preview (Display Only)
+# -----------------------------------------
+st.subheader("Customer Quote Preview")
 
-            st.download_button(
-                label="📥 Download Customer Quote",
-                data=output,
-                file_name=f"{output_filename}_customer.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+# Filter out empty rows for preview
+preview_rows = []
+for _, row in calculated_df.iterrows():
+    site = str(row.get("Site Name", "") or "").strip()
+    postcode = str(row.get("Post Code", "") or "").strip()
+    try:
+        kwh = float(row.get("Annual KWH", 0) or 0)
+    except (ValueError, TypeError):
+        kwh = 0.0
+    
+    if site and postcode and kwh > 0:  # Only include completed rows
+        preview_data = {
+            "Site Name": site,
+            "Post Code": postcode,
+            "Annual KWH": kwh
+        }
+        # Add customer-facing pricing (final rates and TAC only)
+        for duration in [12, 24, 36]:
+            preview_data[f"Standing Charge ({duration}m)"] = f"{row.get(f'Final Standing Charge ({duration}m)', 0):.2f}p"
+            preview_data[f"Unit Rate ({duration}m)"] = f"{row.get(f'Final Unit Rate ({duration}m)', 0):.3f}p"
+            preview_data[f"Annual Cost ({duration}m)"] = f"£{row.get(f'TAC £({duration}m)', 0):.2f}"
+        
+        preview_rows.append(preview_data)
 
+if preview_rows:
+    preview_df = pd.DataFrame(preview_rows)
+    st.dataframe(preview_df, use_container_width=True, hide_index=True)
+    
+    # -----------------------------------------
+    # Step 6: Export Customer Quote
+    # -----------------------------------------
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        preview_df.to_excel(writer, index=False, sheet_name="Quote")
+    output.seek(0)
+
+    st.download_button(
+        label="📥 Download Customer Quote",
+        data=output,
+        file_name=f"{output_filename}_quote.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 else:
-    st.info("📁 Please upload a supplier flat file to begin creating quotes.")
+    st.info("👆 Add sites above to see customer quote preview")
