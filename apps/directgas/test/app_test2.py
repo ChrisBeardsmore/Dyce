@@ -216,10 +216,13 @@ if uploaded_file:
     if st.checkbox("Show Debug Info"):
         if not updated_df.empty:
             test_row = updated_df.iloc[0]
-            st.write("Debug - First Row Values:")
-            st.write(f"Unit Uplift (12m): {test_row.get('Uplift Unit Rate (12m)', 'NOT FOUND')}")
-            st.write(f"Base Unit (12m): {test_row.get('Base Unit Rate (12m)', 'NOT FOUND')}")
-            st.write(f"Final Unit (12m): {test_row.get('Final Unit Rate (12m)', 'NOT FOUND')}")
+            st.write("Debug - All Duration Calculations:")
+            for duration in [12, 24, 36]:
+                st.write(f"--- {duration}m Duration ---")
+                st.write(f"Base Unit: {test_row.get(f'Base Unit Rate ({duration}m)', 'NOT FOUND')}")
+                st.write(f"Uplift Unit: {test_row.get(f'Uplift Unit Rate ({duration}m)', 'NOT FOUND')}")
+                st.write(f"Final Unit: {test_row.get(f'Final Unit Rate ({duration}m)', 'NOT FOUND')}")
+                st.write("")
 
     # -----------------------------------------
     # Step 6: Customer Quote Preview (Display Only)
