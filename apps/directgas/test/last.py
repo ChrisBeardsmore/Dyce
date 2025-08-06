@@ -67,84 +67,56 @@ if uploaded_file:
         st.rerun()
 
     # -----------------------------------------
-    # Step 3B: Add Sites via Input Form
-    # -----------------------------------------
-    st.subheader("🔹 Add Sites to Quote")
+# Step 3B: Add Sites via Input Form
+# -----------------------------------------
+st.subheader("🔹 Add Sites to Quote")
 
-    with st.form("add_site_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-      with col1:
-    site_name = st.text_input("Site Name")
-    mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
-        with col2:
-            postcode = st.text_input("Post Code")
-            try:
-                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-            except ValueError:
-                consumption = 0.0
-        submitted = st.form_submit_button("➕ Add Site")
+with st.form("add_site_form", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        site_name = st.text_input("Site Name")
+        mpxn = st.text_input("MPAN (optional)", placeholder="Can leave blank")
+    with col2:
+        postcode = st.text_input("Post Code")
+        try:
+            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+        except ValueError:
+            consumption = 0.0
+    submitted = st.form_submit_button("➕ Add Site")
 
-    if submitted:
-        if site_name and postcode and consumption > 0:
-            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-            if not ldz:
-                st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
-            else:
-                new_row = {
-    "MPXN": site_name.strip(),
-    "Post Code": postcode.strip(),
-    "Annual Consumption KWh": consumption
-}
-
-# Clear all previous keys to prevent accidental duplicates
-all_keys = []
-
-for d in [12, 24, 36]:
-    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-    base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
-    
-    keys = {
-        f"Standing Charge (Base {d}m)": round(base_sc, 2),
-        f"Unit Rate (Base {d}m)": round(base_unit, 3),
-        f"Standing Charge (uplift {d}m)": 0.00,
-        f"Unit Rate (Uplift {d}m)": 0.000,
-        f"Sell Standing Charge ({d}m)": round(base_sc, 2),
-        f"Sell Unit Rate ({d}m)": round(base_unit, 3),
-        f"TAC ({d}m)": base_tac,
-        f"Margin £({d}m)": 0.00
-    }
-    new_row.update(keys)
-    all_keys.extend(keys.keys())
-
-# Optional: check for duplicates
-if len(all_keys) != len(set(all_keys)):
-    st.error("❌ Duplicate column keys found while building new row. Please review.")new_row = {
-                    "MPXN": site_name.strip(),
-                    "Post Code": postcode.strip(),
-                    "Annual Consumption KWh": consumption
-                }
-
-                for d in [12, 24, 36]:
-                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-                    base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
-                    
-                    new_row.update({
-                        f"Standing Charge (Base {d}m)": round(base_sc, 2),
-                        f"Unit Rate (Base {d}m)": round(base_unit, 3),
-                        f"Standing Charge (uplift {d}m)": 0,
-                        f"Unit Rate (Uplift {d}m)": 0,
-                        f"Sell Standing Charge ({d}m)": round(base_sc, 2),
-                        f"Sell Unit Rate ({d}m)": round(base_unit, 3),
-                        f"TAC ({d}m)": base_tac,
-                        f"Margin £({d}m)": 0
-                    })
-
-                st.session_state.input_df = pd.concat([
-                    st.session_state.input_df,
-                    pd.DataFrame([new_row])
-                ], ignore_index=True)
+if submitted:
+    if site_name and postcode and consumption > 0:
+        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+        if not ldz:
+            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
         else:
-            st.warning("Please enter valid Site Name, Post Code, and KWH.")
+            new_row = {
+                "Site Name": site_name.strip(),
+                "Post Code": postcode.strip(),
+                "Annual Consumption KWh": consumption
+            }
+
+            for d in [12, 24, 36]:
+                base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+
+                new_row.update({
+                    f"Standing Charge (Base {d}m)": round(base_sc, 2),
+                    f"Unit Rate (Base {d}m)": round(base_unit, 3),
+                    f"Standing Charge (uplift {d}m)": 0.00,
+                    f"Unit Rate (Uplift {d}m)": 0.000,
+                    f"Sell Standing Charge ({d}m)": round(base_sc, 2),
+                    f"Sell Unit Rate ({d}m)": round(base_unit, 3),
+                    f"TAC ({d}m)": base_tac,
+                    f"Margin £({d}m)": 0.00
+                })
+
+            st.session_state.input_df = pd.concat([
+                st.session_state.input_df,
+                pd.DataFrame([new_row])
+            ], ignore_index=True)
+    else:
+        st.warning("⚠️ Please enter a valid Site Name, Post Code, and KWH.")
 
     # -----------------------------------------
     # Step 4: Agent Input Grid (All Calculations Happen Here)
