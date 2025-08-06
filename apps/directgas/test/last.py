@@ -66,106 +66,107 @@ if uploaded_file:
         st.rerun()
 
     # -----------------------------------------
-# Step 3B: Add Sites via Input Form
-# -----------------------------------------
-st.subheader("🔹 Add Sites to Quote")
+    # Step 3B: Add Sites via Input Form
+    # -----------------------------------------
+    st.subheader("🔹 Add Sites to Quote")
 
-with st.form("add_site_form", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        site_name = st.text_input("Site Name")
-        mpxn = st.text_input("MPXN (optional)", placeholder="Can leave blank")
-    with col2:
-        postcode = st.text_input("Post Code")
-        try:
-            consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
-        except ValueError:
-            consumption = 0.0
-    submitted = st.form_submit_button("➕ Add Site")
+    with st.form("add_site_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_name = st.text_input("Site Name")
+            mpxn = st.text_input("MPXN (optional)", placeholder="Can leave blank")
+        with col2:
+            postcode = st.text_input("Post Code")
+            try:
+                consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
+            except ValueError:
+                consumption = 0.0
+        submitted = st.form_submit_button("➕ Add Site")
 
-if submitted:
-    if site_name and postcode and consumption > 0:
-        ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
-        if not ldz:
-            st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+    if submitted:
+        if site_name and postcode and consumption > 0:
+            ldz = match_postcode_to_ldz(postcode.strip(), ldz_df)
+            if not ldz:
+                st.error(f"❌ Postcode '{postcode}' not found in LDZ database. Please check the postcode.")
+            else:
+                new_row = {
+                    "Site Name": site_name.strip(),
+                    "Post Code": postcode.strip(),
+                    "Annual Consumption KWh": float(consumption)
+                }
+
+                for d in [12, 24, 36]:
+                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                    base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+
+                    new_row.update({
+                        f"Standing Charge (Base {d}m)": float(round(base_sc, 2)),
+                        f"Unit Rate (Base {d}m)": float(round(base_unit, 3)),
+                        f"Standing Charge (uplift {d}m)": float(0.00),
+                        f"Unit Rate (Uplift {d}m)": float(0.000),
+                        f"Sell Standing Charge ({d}m)": float(round(base_sc, 2)),
+                        f"Sell Unit Rate ({d}m)": float(round(base_unit, 3)),
+                        f"TAC ({d}m)": float(base_tac),
+                        f"Margin £({d}m)": float(0.00)
+                    })
+
+                st.session_state.input_df = pd.concat([
+                    st.session_state.input_df,
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
         else:
-            new_row = {
-                "Site Name": site_name.strip(),
-                "Post Code": postcode.strip(),
-                "Annual Consumption KWh": float(consumption)
-            }
+            st.warning("⚠️ Please enter a valid Site Name, Post Code, and KWH.")
 
-            for d in [12, 24, 36]:
-                base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
-                base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+    # -----------------------------------------
+    # Step 4: Agent Input Grid
+    # -----------------------------------------
+    st.subheader("Agent Input Grid")
 
-                new_row.update({
-                    f"Standing Charge (Base {d}m)": float(round(base_sc, 2)),
-                    f"Unit Rate (Base {d}m)": float(round(base_unit, 3)),
-                    f"Standing Charge (uplift {d}m)": float(0.00),
-                    f"Unit Rate (Uplift {d}m)": float(0.000),
-                    f"Sell Standing Charge ({d}m)": float(round(base_sc, 2)),
-                    f"Sell Unit Rate ({d}m)": float(round(base_unit, 3)),
-                    f"TAC ({d}m)": float(base_tac),
-                    f"Margin £({d}m)": float(0.00)
-                })
+    # Use a dynamic key to avoid glitchy rendering issues
+    grid_key = f"agent_grid_{len(st.session_state.input_df)}"
 
-            st.session_state.input_df = pd.concat([
-                st.session_state.input_df,
-                pd.DataFrame([new_row])
-            ], ignore_index=True)
-    else:
-        st.warning("⚠️ Please enter a valid Site Name, Post Code, and KWH.")
+    column_config = {
+        "Site Name": st.column_config.TextColumn("Site Name"),
+        "Post Code": st.column_config.TextColumn("Post Code"),
+        "Annual Consumption KWh": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f")
+    }
 
-# -----------------------------------------
-# Step 4: Agent Input Grid
-# -----------------------------------------
-st.subheader("Agent Input Grid")
+    for duration in [12, 24, 36]:
+        column_config[f"Standing Charge (uplift {duration}m)"] = st.column_config.NumberColumn(
+            f"Standing Charge (uplift {duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
+        )
+        column_config[f"Unit Rate (Uplift {duration}m)"] = st.column_config.NumberColumn(
+            f"Unit Rate (Uplift {duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
+        )
+        column_config[f"Standing Charge (Base {duration}m)"] = st.column_config.NumberColumn(
+            f"Standing Charge (Base {duration}m)", format="%.2f", disabled=True
+        )
+        column_config[f"Unit Rate (Base {duration}m)"] = st.column_config.NumberColumn(
+            f"Unit Rate (Base {duration}m)", format="%.3f", disabled=True
+        )
+        column_config[f"Sell Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
+            f"Sell Standing Charge ({duration}m)", format="%.2f", disabled=True
+        )
+        column_config[f"Sell Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
+            f"Sell Unit Rate ({duration}m)", format="%.3f", disabled=True
+        )
+        column_config[f"TAC ({duration}m)"] = st.column_config.NumberColumn(
+            f"TAC ({duration}m)", format="£%.2f", disabled=True
+        )
+        column_config[f"Margin £({duration}m)"] = st.column_config.NumberColumn(
+            f"Margin £({duration}m)", format="£%.2f", disabled=True
+        )
 
-# Use a dynamic key to avoid glitchy rendering issues
-grid_key = f"agent_grid_{len(st.session_state.input_df)}"
-
-column_config = {
-    "Site Name": st.column_config.TextColumn("Site Name"),
-    "Post Code": st.column_config.TextColumn("Post Code"),
-    "Annual Consumption KWh": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f")
-}
-
-for duration in [12, 24, 36]:
-    column_config[f"Standing Charge (uplift {duration}m)"] = st.column_config.NumberColumn(
-        f"Standing Charge (uplift {duration}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f", help="Max 100p/day"
+    # Render the editable data grid
+    edited_df = st.data_editor(
+        st.session_state.input_df,
+        use_container_width=True,
+        num_rows="dynamic",
+        hide_index=True,
+        column_config=column_config,
+        key=grid_key
     )
-    column_config[f"Unit Rate (Uplift {duration}m)"] = st.column_config.NumberColumn(
-        f"Unit Rate (Uplift {duration}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f", help="Max 3.000p/kWh"
-    )
-    column_config[f"Standing Charge (Base {duration}m)"] = st.column_config.NumberColumn(
-        f"Standing Charge (Base {duration}m)", format="%.2f", disabled=True
-    )
-    column_config[f"Unit Rate (Base {duration}m)"] = st.column_config.NumberColumn(
-        f"Unit Rate (Base {duration}m)", format="%.3f", disabled=True
-    )
-    column_config[f"Sell Standing Charge ({duration}m)"] = st.column_config.NumberColumn(
-        f"Sell Standing Charge ({duration}m)", format="%.2f", disabled=True
-    )
-    column_config[f"Sell Unit Rate ({duration}m)"] = st.column_config.NumberColumn(
-        f"Sell Unit Rate ({duration}m)", format="%.3f", disabled=True
-    )
-    column_config[f"TAC ({duration}m)"] = st.column_config.NumberColumn(
-        f"TAC ({duration}m)", format="£%.2f", disabled=True
-    )
-    column_config[f"Margin £({duration}m)"] = st.column_config.NumberColumn(
-        f"Margin £({duration}m)", format="£%.2f", disabled=True
-    )
-
-# Render the editable data grid
-edited_df = st.data_editor(
-    st.session_state.input_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    hide_index=True,
-    column_config=column_config,
-    key=grid_key
-)
+    
     # -----------------------------------------
     # Step 5: Calculate Button Logic
     # -----------------------------------------
