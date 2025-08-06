@@ -16,7 +16,7 @@ import streamlit as st
 # -----------------------------------------
 def load_ldz_data() -> pd.DataFrame:
     """Load LDZ mapping data from local CSV and clean postcode column."""
-    file_path = "data/postcode_ldz_full.csv"
+    file_path = "../../inputs/postcode_ldz_full.csv"
     
     df = pd.read_csv(file_path)  # <-- Use local file instead
     
