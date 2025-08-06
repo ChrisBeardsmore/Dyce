@@ -46,12 +46,12 @@ ldz_df = load_ldz_data()
 # -----------------------------------------
 uploaded_file = st.file_uploader("Upload Supplier Flat File (XLSX)", type=["xlsx"])
 
+# Initialize session state BEFORE any conditionals
+if "input_df" not in st.session_state:
+    st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
+
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
-
-    # Initialize session state immediately after file load
-    if "input_df" not in st.session_state:
-        st.session_state.input_df, st.session_state.all_cols = create_input_dataframe(num_rows=0)
 
     # -----------------------------------------
     # Step 3: Quote Configuration Inputs
