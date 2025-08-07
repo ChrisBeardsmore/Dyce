@@ -12,8 +12,11 @@ import pandas as pd
 from PIL import Image
 from datetime import date  # NEW: Import for start date
 
-# Fix: Add /apps to Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..", "apps")))
+# ✅ Fix: Add /apps to Python path more robustly
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))             # e.g. /apps/directgas
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "../../.."))    # moves up to project root
+APPS_DIR = os.path.join(ROOT_DIR, "apps")                            # /apps
+sys.path.append(APPS_DIR)
 
 # Core logic imports
 from logic.ldz_lookup import load_ldz_data, match_postcode_to_ldz
