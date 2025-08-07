@@ -1,1 +1,33 @@
+[theme]
+# Primary theme color (blue) - rgb(154, 252, 255) assuming you meant this blue
+primaryColor = "#9afcff"
 
+# Background color (white)
+backgroundColor = "#ffffff"
+
+# Secondary background color (light gray)
+secondaryBackgroundColor = "#f0f2f6"
+
+# Text color (dark gray)
+textColor = "#262730"
+
+# Font family
+font = "sans serif"
+
+[server]
+# Port configuration
+port = 8501
+
+# Enable CORS for all origins
+enableCORS = false
+
+# Enable XSS protection
+enableXsrfProtection = true
+
+[browser]
+# Automatically open browser when starting
+gatherUsageStats = false
+
+[client]
+# Show error details in production
+showErrorDetails = true
