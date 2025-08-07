@@ -128,10 +128,7 @@ if uploaded_file:
         edited_df = st.data_editor(st.session_state.input_df, use_container_width=True, num_rows="dynamic", hide_index=True, column_config=column_config, key=grid_key)
         st.session_state.input_df = edited_df.copy()
 
-    # ✅ FIXED: Calculate Rates Section (replace the messy section in your code)
-    # This goes right after: st.session_state.input_df = edited_df.copy()
-    
-    if st.button("🔄 Calculate Rates"):
+      if st.button("🔄 Calculate Rates"):
         updated_df = st.session_state.input_df.copy()
 
         for i, row in updated_df.iterrows():
@@ -179,7 +176,7 @@ if uploaded_file:
         # Update session state with recalculated values
         st.session_state.input_df = updated_df
         st.success("✅ Rates calculated successfully!")
-        st.rerun()
+        st.rerun()  
 
     # Customer Quote Preview section (keep your existing code below this)
 
