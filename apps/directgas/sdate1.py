@@ -1,5 +1,5 @@
 # -----------------------------------------
-# File: sdate.py (Refactored UI Logic)
+# File: sdate1.py (Clean Complete Version)
 # Purpose: Streamlit frontend for Dyce's multi-site gas quote builder
 # -----------------------------------------
 
@@ -51,12 +51,15 @@ if uploaded_file:
     # Step 3: Quote Configuration
     st.subheader("Quote Configuration")
     config_col1, config_col2, config_col3 = st.columns(3)
+    
     with config_col1:
         customer_name = st.text_input("Customer Name")
         product_type = st.selectbox("Product Type", ["Standard Gas", "Carbon Off"])
+    
     with config_col2:
         contract_start_date = st.date_input("Contract Start Date", value=date.today(), help="When should the contract begin?")
         output_filename = st.text_input("Output file name", value="dyce_quote")
+    
     with config_col3:
         st.write("")
         if st.button("🔄 Reset All Data (Clear Session)"):
@@ -67,17 +70,21 @@ if uploaded_file:
 
     # Step 3B: Add Sites
     st.subheader("🔹 Add Sites to Quote")
+    
     with st.form("add_site_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
+        
         with col1:
             site_name = st.text_input("Site Name")
             site_reference = st.text_input("Site Reference (optional)", placeholder="Can leave blank")
+        
         with col2:
             postcode = st.text_input("Post Code")
             try:
                 consumption = float(st.text_input("Annual Consumption (kWh)", "0"))
             except ValueError:
                 consumption = 0.0
+        
         submitted = st.form_submit_button("➕ Add Site")
 
     if submitted:
@@ -93,9 +100,11 @@ if uploaded_file:
                     "Annual Consumption KWh": float(consumption),
                     "Contract Start Date": contract_start_date.strftime("%d/%m/%Y")
                 }
+                
                 for d in [12, 24, 36]:
                     base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df, start_date=contract_start_date)
                     base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
+                    
                     new_row.update({
                         f"Standing Charge (Base {d}m)": round(base_sc, 2),
                         f"Unit Rate (Base {d}m)": round(base_unit, 3),
@@ -106,15 +115,26 @@ if uploaded_file:
                         f"TAC ({d}m)": base_tac,
                         f"Margin £({d}m)": 0.00
                     })
+                
                 st.session_state.input_df = pd.concat([st.session_state.input_df, pd.DataFrame([new_row])], ignore_index=True)
                 st.success(f"✅ Added {site_name} - Contract starts {contract_start_date.strftime('%d/%m/%Y')}")
         else:
             st.warning("⚠️ Please enter a valid Site Name, Post Code, and kWh.")
 
+    # Agent Input Grid & Calculate Section
     if not st.session_state.input_df.empty:
         st.subheader("Agent Input Grid")
+        
         grid_key = f"agent_grid_{len(st.session_state.input_df)}"
-        column_config = {"Site Name": st.column_config.TextColumn("Site Name"), "Site Reference": st.column_config.TextColumn("Site Reference"), "Post Code": st.column_config.TextColumn("Post Code"), "Annual Consumption KWh": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f"), "Contract Start Date": st.column_config.TextColumn("Start Date")}
+        
+        column_config = {
+            "Site Name": st.column_config.TextColumn("Site Name"),
+            "Site Reference": st.column_config.TextColumn("Site Reference"),
+            "Post Code": st.column_config.TextColumn("Post Code"),
+            "Annual Consumption KWh": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f"),
+            "Contract Start Date": st.column_config.TextColumn("Start Date")
+        }
+        
         for d in [12, 24, 36]:
             column_config[f"Standing Charge (uplift {d}m)"] = st.column_config.NumberColumn(f"Standing Charge (uplift {d}m)", min_value=0, max_value=100.0, step=0.01, format="%.2f")
             column_config[f"Unit Rate (Uplift {d}m)"] = st.column_config.NumberColumn(f"Unit Rate (Uplift {d}m)", min_value=0, max_value=3.000, step=0.001, format="%.3f")
@@ -128,87 +148,64 @@ if uploaded_file:
         edited_df = st.data_editor(st.session_state.input_df, use_container_width=True, num_rows="dynamic", hide_index=True, column_config=column_config, key=grid_key)
         st.session_state.input_df = edited_df.copy()
 
-      if st.button("🔄 Calculate Rates"):
-        updated_df = st.session_state.input_df.copy()
+        # Calculate Rates Button
+        if st.button("🔄 Calculate Rates"):
+            updated_df = st.session_state.input_df.copy()
 
-        for i, row in updated_df.iterrows():
-            postcode = str(row.get("Post Code", "") or "").strip()
-            row_start_date = str(row.get("Contract Start Date", "") or "").strip()
-            
-            try:
-                kwh = float(row.get("Annual Consumption KWh", 0) or 0)
-            except (ValueError, TypeError):
-                kwh = 0.0
-
-            if not postcode or kwh <= 0:
-                continue
-
-            # Get LDZ for recalculating base rates with current uplifts
-            ldz = match_postcode_to_ldz(postcode, ldz_df)
-            
-            for duration in [12, 24, 36]:
+            for i, row in updated_df.iterrows():
+                postcode = str(row.get("Post Code", "") or "").strip()
+                
                 try:
-                    # Get current base rates (these shouldn't change)
-                    base_sc = float(row.get(f"Standing Charge (Base {duration}m)", 0) or 0)
-                    base_unit = float(row.get(f"Unit Rate (Base {duration}m)", 0) or 0)
-                    
-                    # Get the manual uplifts from the grid
-                    uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
-                    uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
-                    
-                    # Calculate final sell prices = base + uplifts
-                    final_sc = base_sc + uplift_sc
-                    final_unit = base_unit + uplift_unit
-                    
-                    # Calculate TAC and margin using the TAC calculator
-                    sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+                    kwh = float(row.get("Annual Consumption KWh", 0) or 0)
+                except (ValueError, TypeError):
+                    kwh = 0.0
 
-                    # Update the sell prices and calculations in the dataframe
-                    updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
-                    updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
-                    updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
-                    updated_df.at[i, f"Margin £({duration}m)"] = margin
-
-                except Exception as e:
-                    st.warning(f"⚠️ Error calculating row {i+1}, {duration}m: {e}")
+                if not postcode or kwh <= 0:
                     continue
 
-        # Update session state with recalculated values
-        st.session_state.input_df = updated_df
-        st.success("✅ Rates calculated successfully!")
-        st.rerun()  
+                ldz = match_postcode_to_ldz(postcode, ldz_df)
+                
+                for duration in [12, 24, 36]:
+                    try:
+                        base_sc = float(row.get(f"Standing Charge (Base {duration}m)", 0) or 0)
+                        base_unit = float(row.get(f"Unit Rate (Base {duration}m)", 0) or 0)
+                        uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
+                        uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
+                        
+                        final_sc = base_sc + uplift_sc
+                        final_unit = base_unit + uplift_unit
+                        
+                        sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
 
-    # Customer Quote Preview section (keep your existing code below this)
+                        updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
+                        updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
+                        updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
+                        updated_df.at[i, f"Margin £({duration}m)"] = margin
 
-                    sell_tac, margin = calculate_tac_and_margin(
-                        kwh, base_sc, base_unit, uplift_sc, uplift_unit
-                    )
+                    except Exception as e:
+                        st.warning(f"Error calculating row {i+1}, {duration}m: {e}")
+                        continue
 
-                    updated_df.at[i, f"Sell Standing Charge ({d}m)"] = round(final_sc, 2)
-                    updated_df.at[i, f"Sell Unit Rate ({d}m)"] = round(final_unit, 3)
-                    updated_df.at[i, f"TAC ({d}m)"] = sell_tac
-                    updated_df.at[i, f"Margin £({d}m)"] = margin
+            st.session_state.input_df = updated_df
+            st.success("✅ Rates calculated successfully!")
+            st.rerun()
 
-                except Exception as e:
-                    st.warning(f"⚠️ Error calculating row {i}, {d}m: {e}")
-                    continue
-
-        st.session_state.input_df = updated_df
-        st.success("✅ Rates calculated successfully!")
-        st.rerun()
-
-        # Customer Quote Preview
+    # Customer Quote Preview
+    if not st.session_state.input_df.empty:
         st.subheader("Customer Quote Preview")
+        
         preview_rows = []
         for _, row in st.session_state.input_df.iterrows():
             site = str(row.get("Site Name", "") or "").strip()
             postcode = str(row.get("Post Code", "") or "").strip()
             site_ref = str(row.get("Site Reference", "") or "").strip()
             start_date = str(row.get("Contract Start Date", "") or "").strip()
+            
             try:
                 kwh = float(row.get("Annual Consumption KWh", 0) or 0)
             except (ValueError, TypeError):
                 kwh = 0.0
+            
             if site and postcode and kwh > 0:
                 preview_data = {
                     "Site Name": site,
@@ -217,21 +214,31 @@ if uploaded_file:
                     "Annual Consumption KWh": kwh,
                     "Contract Start Date": start_date
                 }
+                
                 for d in [12, 24, 36]:
                     preview_data[f"Standing Charge ({d}m)"] = f"{row.get(f'Sell Standing Charge ({d}m)', 0):.2f}p"
                     preview_data[f"Unit Rate ({d}m)"] = f"{row.get(f'Sell Unit Rate ({d}m)', 0):.3f}p"
                     preview_data[f"Annual Cost ({d}m)"] = f"£{row.get(f'TAC ({d}m)', 0):.2f}"
+                
                 preview_rows.append(preview_data)
 
         if preview_rows:
             preview_df = pd.DataFrame(preview_rows)
             st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 preview_df.to_excel(writer, index=False, sheet_name="Quote")
             output.seek(0)
-            st.download_button(label="📥 Download Customer Quote", data=output, file_name=f"{output_filename}_quote.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            st.download_button(
+                label="📥 Download Customer Quote", 
+                data=output, 
+                file_name=f"{output_filename}_quote.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.info("👆 Add sites above to see customer quote preview")
+
 else:
     st.info("📁 Please upload a supplier flat file to begin creating quotes.")
