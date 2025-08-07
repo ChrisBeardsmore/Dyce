@@ -128,7 +128,10 @@ if uploaded_file:
         edited_df = st.data_editor(st.session_state.input_df, use_container_width=True, num_rows="dynamic", hide_index=True, column_config=column_config, key=grid_key)
         st.session_state.input_df = edited_df.copy()
 
-       with st.form("calculate_rates_form"):
+       # ✅ This should come immediately after:
+# st.session_state.input_df = edited_df.copy()
+
+with st.form("calculate_rates_form"):
     st.markdown("✅ Click below to apply uplifts and recalculate all sell prices and TAC values.")
     submitted = st.form_submit_button("🔄 Calculate Rates")
 
@@ -153,6 +156,24 @@ if uploaded_file:
 
                     final_sc = base_sc + uplift_sc
                     final_unit = base_unit + uplift_unit
+
+                    sell_tac, margin = calculate_tac_and_margin(
+                        kwh, base_sc, base_unit, uplift_sc, uplift_unit
+                    )
+
+                    updated_df.at[i, f"Sell Standing Charge ({d}m)"] = round(final_sc, 2)
+                    updated_df.at[i, f"Sell Unit Rate ({d}m)"] = round(final_unit, 3)
+                    updated_df.at[i, f"TAC ({d}m)"] = sell_tac
+                    updated_df.at[i, f"Margin £({d}m)"] = margin
+
+                except Exception as e:
+                    st.warning(f"⚠️ Error calculating row {i}, {d}m: {e}")
+                    continue
+
+        st.session_state.input_df = updated_df
+        st.success("✅ Rates calculated successfully!")
+        st.rerun()
+
 
                     sell_tac, margin = calculate_tac_and_margin(
                         kwh, base_sc, base_unit, uplift_sc, uplift_unit
