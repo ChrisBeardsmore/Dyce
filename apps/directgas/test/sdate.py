@@ -198,7 +198,7 @@ if uploaded_file:
     # Step 5: Calculate Button Logic
     # -----------------------------------------
     if st.button("🔄 Calculate Rates"):
-    updated_df = st.session_state.input_df.copy()
+        updated_df = st.session_state.input_df.copy()
 
     for i, row in updated_df.iterrows():
         postcode = str(row.get("Post Code", "") or "").strip()
