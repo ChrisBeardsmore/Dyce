@@ -198,16 +198,15 @@ if uploaded_file:
     st.session_state.input_df = edited_df.copy()
     
     # -----------------------------------------
-    # Step 5: Calculate Button Logic
-    # -----------------------------------------
-    if st.button("🔄 Calculate Rates"):
-        updated_df = st.session_state.input_df.copy()
+# Step 5: Calculate Button Logic
+# -----------------------------------------
+if st.button("🔄 Calculate Rates"):
+    updated_df = st.session_state.input_df.copy()
 
     for i, row in updated_df.iterrows():
         postcode = str(row.get("Post Code", "") or "").strip()
-        # NEW: Get the start date for this row
         row_start_date = str(row.get("Contract Start Date", "") or "").strip()
-        
+
         try:
             kwh = float(row.get("Annual Consumption KWh", 0) or 0)
         except (ValueError, TypeError):
@@ -215,21 +214,24 @@ if uploaded_file:
 
         if not postcode or kwh <= 0:
             continue
-  # NEW: Get LDZ for this row to recalculate base rates with start date
+
+        # Get LDZ for this row
         ldz = match_postcode_to_ldz(postcode, ldz_df)
-        
+
         for duration in [12, 24, 36]:
             try:
-                # NEW: Recalculate base rates with start date
-                base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df, start_date=row_start_date)
-                
-                # Update the base rates in the dataframe
-                updated_df.at[i, f"Standing Charge (Base {duration}m)"] = round(base_sc, 2)
-                updated_df.at[i, f"Unit Rate (Base {duration}m)"] = round(base_unit, 3)
-                
-                # Get uplifts
+                # Recalculate base rates with start date
+                base_sc, base_unit = get_base_rates(
+                    ldz, kwh, duration, carbon_offset_required, flat_df, start_date=row_start_date
+                )
+
                 uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
                 uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
+
+                # Update the base rates
+                updated_df.at[i, f"Standing Charge (Base {duration}m)"] = round(base_sc, 2)
+                updated_df.at[i, f"Unit Rate (Base {duration}m)"] = round(base_unit, 3)
+
             except (ValueError, TypeError):
                 base_sc = base_unit = uplift_sc = uplift_unit = 0.0
 
