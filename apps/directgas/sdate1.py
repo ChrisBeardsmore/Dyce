@@ -111,9 +111,7 @@ if uploaded_file:
         else:
             st.warning("⚠️ Please enter a valid Site Name, Post Code, and kWh.")
 
-    # If sites exist, show grid, calculator and preview
     if not st.session_state.input_df.empty:
-        # Step 4: Input Grid
         st.subheader("Agent Input Grid")
         grid_key = f"agent_grid_{len(st.session_state.input_df)}"
         column_config = {"Site Name": st.column_config.TextColumn("Site Name"), "Site Reference": st.column_config.TextColumn("Site Reference"), "Post Code": st.column_config.TextColumn("Post Code"), "Annual Consumption KWh": st.column_config.NumberColumn("Annual Consumption KWh", min_value=0, step=1, format="%.0f"), "Contract Start Date": st.column_config.TextColumn("Start Date")}
@@ -130,40 +128,35 @@ if uploaded_file:
         edited_df = st.data_editor(st.session_state.input_df, use_container_width=True, num_rows="dynamic", hide_index=True, column_config=column_config, key=grid_key)
         st.session_state.input_df = edited_df.copy()
 
-        # Step 5: Calculate Rates
         if st.button("🔄 Calculate Rates"):
             updated_df = st.session_state.input_df.copy()
             for i, row in updated_df.iterrows():
-                postcode = str(row.get("Post Code", "") or "").strip()
-                row_start_date = str(row.get("Contract Start Date", "") or "").strip()
                 try:
                     kwh = float(row.get("Annual Consumption KWh", 0) or 0)
                 except (ValueError, TypeError):
                     kwh = 0.0
-                if not postcode or kwh <= 0:
+                if kwh <= 0:
                     continue
-                ldz = match_postcode_to_ldz(postcode, ldz_df)
                 for d in [12, 24, 36]:
                     try:
-                        base_sc, base_unit = get_base_rates(ldz, kwh, d, carbon_offset_required, flat_df, start_date=row_start_date)
+                        base_sc = float(row.get(f"Standing Charge (Base {d}m)", 0) or 0)
+                        base_unit = float(row.get(f"Unit Rate (Base {d}m)", 0) or 0)
                         uplift_sc = float(row.get(f"Standing Charge (uplift {d}m)", 0) or 0)
                         uplift_unit = float(row.get(f"Unit Rate (Uplift {d}m)", 0) or 0)
-                        updated_df.at[i, f"Standing Charge (Base {d}m)"] = round(base_sc, 2)
-                        updated_df.at[i, f"Unit Rate (Base {d}m)"] = round(base_unit, 3)
-                    except (ValueError, TypeError):
-                        base_sc = base_unit = uplift_sc = uplift_unit = 0.0
-                    final_sc = base_sc + uplift_sc
-                    final_unit = base_unit + uplift_unit
-                    sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-                    updated_df.at[i, f"Sell Standing Charge ({d}m)"] = round(final_sc, 2)
-                    updated_df.at[i, f"Sell Unit Rate ({d}m)"] = round(final_unit, 3)
-                    updated_df.at[i, f"TAC ({d}m)"] = sell_tac
-                    updated_df.at[i, f"Margin £({d}m)"] = margin
+                        final_sc = base_sc + uplift_sc
+                        final_unit = base_unit + uplift_unit
+                        sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+                        updated_df.at[i, f"Sell Standing Charge ({d}m)"] = round(final_sc, 2)
+                        updated_df.at[i, f"Sell Unit Rate ({d}m)"] = round(final_unit, 3)
+                        updated_df.at[i, f"TAC ({d}m)"] = sell_tac
+                        updated_df.at[i, f"Margin £({d}m)"] = margin
+                    except Exception:
+                        continue
             st.session_state.input_df = updated_df
             st.success("✅ Rates calculated successfully!")
             st.rerun()
 
-        # Step 6: Customer Quote Preview
+        # Customer Quote Preview
         st.subheader("Customer Quote Preview")
         preview_rows = []
         for _, row in st.session_state.input_df.iterrows():
