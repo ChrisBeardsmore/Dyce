@@ -2,17 +2,12 @@ import streamlit as st
 import pandas as pd
 import io
 from datetime import datetime
+from utils.llf import load_llf_mapping, get_llf_band
 
 st.set_page_config(page_title="Direct Sales LLF Multi-tool", layout="wide")
 st.title("Direct Sales LLF Multi-tool")
 
-# Load LLF Mapping Table from external source
-LLF_MAPPING_URL = "https://github.com/ChrisBeardsmore/Gas-Pricing/raw/main/LLF%20Mapping%20Table_External.xlsx"
-
-@st.cache_data
-def load_llf_mapping():
-    return pd.read_excel(LLF_MAPPING_URL, skiprows=1)
-
+# Load LLF Mapping Table from shared inputs folder
 llf_mapping = load_llf_mapping()
 
 # --- File Upload ---
@@ -42,16 +37,11 @@ if uploaded_file:
         consumption = cols[3].number_input("Annual Consumption (kWh)", min_value=0, value=0, step=1000, key=f"consumption_{i}")
         rate_structure = cols[4].selectbox("Rate Structure", options=["DayNight", "Standard"], key=f"rate_struct_{i}")
 
-        band_row = llf_mapping[
-            (llf_mapping["DNO"].astype(str) == str(dno_id)) &
-            (llf_mapping["LLF"].astype(str) == str(llf_code))
-        ]
+        llf_band = get_llf_band(llf_mapping, dno_id, llf_code)
 
-        if not band_row.empty:
-            llf_band = band_row.iloc[0]["Band"]
+        if llf_band:
             st.write(f"LLF Band for Site {i+1}: {llf_band}")
 
-            # Filter flat file
             matched = df[
                 (df["DNO_ID"].astype(str) == str(dno_id)) &
                 (df["LLF_Band"] == llf_band) &
