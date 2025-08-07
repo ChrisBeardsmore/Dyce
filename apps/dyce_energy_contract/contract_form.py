@@ -556,4 +556,167 @@ def main():
                     'home_city': home_city,
                     'home_post_code': home_post_code,
                     'prev_building_no': prev_building_no,
-                    'prev_building_name':
+                    'prev_building_name': prev_building_name,
+                    'prev_address_1': prev_address_1,
+                    'prev_town': prev_town,
+                    'prev_city': prev_city,
+                    'prev_post_code': prev_post_code,
+                    
+                    # TPI Commission
+                    'tpi_sc_uplift_gas': tpi_sc_uplift_gas,
+                    'tpi_unit_rate_uplift_gas': tpi_unit_rate_uplift_gas,
+                    'tpi_sc_uplift_elec': tpi_sc_uplift_elec,
+                    'tpi_unit_rate_uplift_elec': tpi_unit_rate_uplift_elec,
+                    'estimated_commission': estimated_commission,
+                    
+                    # Additional Options
+                    'advanced_saver': advanced_saver,
+                    'climate_agreement': climate_agreement,
+                    'sale_type': sale_type,
+                    'additional_sites': additional_sites,
+                    
+                    # Payment Details
+                    'billing_first_name': billing_first_name,
+                    'billing_last_name': billing_last_name,
+                    'billing_contact_tel': billing_contact_tel,
+                    'billing_contact_email': billing_contact_email,
+                    'billing_building_no': billing_building_no,
+                    'billing_building_name': billing_building_name,
+                    'billing_address_1': billing_address_1,
+                    'billing_town': billing_town,
+                    'billing_city': billing_city,
+                    'billing_post_code': billing_post_code,
+                    'billing_email_only': billing_email_only,
+                    
+                    # Privacy
+                    'contact_preferences': [pref for pref, selected in [
+                        ('mail', contact_mail), ('telephone', contact_telephone),
+                        ('sms', contact_sms), ('email', contact_email)
+                    ] if selected],
+                    
+                    # Terms & Signature
+                    'terms_accepted': terms_accepted,
+                    'signature_name': signature_name,
+                    'job_title': job_title,
+                    'signature_date': signature_date.isoformat(),
+                    
+                    # Direct Debit
+                    'dd_customer_name': dd_customer_name,
+                    'dd_account_holder': dd_account_holder,
+                    'dd_setup': dd_setup,
+                    
+                    # Metadata
+                    'submission_timestamp': datetime.now().isoformat(),
+                    'contract_reference': f"CA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                }
+                
+                contract_ref = form_data['contract_reference']
+                
+                # Save to database
+                conn = st.session_state.db_connection
+                if save_contract_to_db(conn, form_data, contract_ref):
+                    # Try to send email
+                    email_sent = send_contract_email(form_data, contract_ref)
+                    
+                    # Display success message
+                    st.success("✅ Contract submitted successfully!")
+                    
+                    st.markdown(f"""
+                    <div class="success-message">
+                        <h3>🎉 Submission Successful!</h3>
+                        <p><strong>Contract Reference:</strong> {contract_ref}</p>
+                        <p><strong>Submission Time:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+                        <p><strong>Estimated TPI Commission:</strong> £{estimated_commission:.2f}</p>
+                        <p><strong>Email Status:</strong> {"✅ Sent to office" if email_sent else "⚠️ Saved locally (email config needed)"}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Show contract summary
+                    with st.expander("📋 Contract Summary", expanded=True):
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.write("**Client Details:**")
+                            st.write(f"Business: {site_business_name}")
+                            st.write(f"Contact: {site_first_name} {site_last_name}")
+                            st.write(f"Email: {site_contact_email}")
+                            st.write(f"Phone: {site_contact_tel}")
+                            
+                            st.write("**Gas Contract:**")
+                            st.write(f"Length: {gas_contract_length} months")
+                            st.write(f"Standing Charge: {gas_standing_charge}p/day")
+                            st.write(f"Unit Rate: {gas_unit_rate}p/kWh")
+                            st.write(f"Annual Usage: {gas_annual_usage:,} kWh")
+                            
+                        with col_b:
+                            st.write("**TPI Details:**")
+                            st.write(f"Business: {tpi_business_name}")
+                            st.write(f"Contact: {tpi_first_name} {tpi_last_name}")
+                            st.write(f"Email: {tpi_contact_email}")
+                            st.write(f"Commission: £{estimated_commission:.2f}")
+                            
+                            st.write("**Electricity Contract:**")
+                            st.write(f"Length: {elec_contract_length} months")
+                            st.write(f"Standing Charge: {elec_standing_charge}p/day")
+                            st.write(f"Single Rate: {elec_unit_rate_single}p/kWh")
+                            st.write(f"Annual Usage: {elec_annual_usage:,} kWh")
+                    
+                    # Download options
+                    st.subheader("📥 Download Contract Data")
+                    
+                    col_dl1, col_dl2 = st.columns(2)
+                    with col_dl1:
+                        json_str = json.dumps(form_data, indent=2, default=str)
+                        st.download_button(
+                            label="📄 Download as JSON",
+                            data=json_str,
+                            file_name=f"contract_{contract_ref}.json",
+                            mime="application/json"
+                        )
+                    
+                    with col_dl2:
+                        df = pd.DataFrame([form_data])
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            df.to_excel(writer, sheet_name='Contract_Data', index=False)
+                        excel_data = output.getvalue()
+                        
+                        st.download_button(
+                            label="📊 Download as Excel",
+                            data=excel_data,
+                            file_name=f"contract_{contract_ref}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+
+    # Admin Dashboard (optional - in sidebar)
+    if st.sidebar.button("📊 Admin Dashboard"):
+        st.sidebar.markdown("---")
+        
+        conn = st.session_state.db_connection
+        cursor = conn.cursor()
+        
+        # Get stats
+        cursor.execute("SELECT COUNT(*) FROM contracts")
+        total_contracts = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT SUM(estimated_commission) FROM contracts WHERE estimated_commission IS NOT NULL")
+        total_commission = cursor.fetchone()[0] or 0
+        
+        st.sidebar.metric("Total Contracts", total_contracts)
+        st.sidebar.metric("Total Commission", f"£{total_commission:,.2f}")
+        
+        # Recent submissions
+        st.sidebar.markdown("**Recent Submissions:**")
+        cursor.execute("""
+            SELECT contract_reference, tpi_business_name, estimated_commission, 
+                   DATE(created_at) as submission_date
+            FROM contracts 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        """)
+        
+        recent = cursor.fetchall()
+        for row in recent:
+            st.sidebar.text(f"{row[0][:8]}... - £{row[2] or 0:.0f}")
+
+if __name__ == "__main__":
+    main()
