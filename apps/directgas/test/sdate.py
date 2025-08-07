@@ -115,7 +115,7 @@ if uploaded_file:
                 }
 
                 for d in [12, 24, 36]:
-                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df)
+                    base_sc, base_unit = get_base_rates(ldz, consumption, d, carbon_offset_required, flat_df, start_date=contract_start_date)
                     base_tac = round((base_sc * 365 + base_unit * consumption) / 100, 2)
 
                     new_row.update({
@@ -198,39 +198,50 @@ if uploaded_file:
     # Step 5: Calculate Button Logic
     # -----------------------------------------
     if st.button("🔄 Calculate Rates"):
-        updated_df = st.session_state.input_df.copy()
+    updated_df = st.session_state.input_df.copy()
 
-        for i, row in updated_df.iterrows():
-            postcode = str(row.get("Post Code", "") or "").strip()
+    for i, row in updated_df.iterrows():
+        postcode = str(row.get("Post Code", "") or "").strip()
+        # NEW: Get the start date for this row
+        row_start_date = str(row.get("Contract Start Date", "") or "").strip()
+        
+        try:
+            kwh = float(row.get("Annual Consumption KWh", 0) or 0)
+        except (ValueError, TypeError):
+            kwh = 0.0
+
+        if not postcode or kwh <= 0:
+            continue
+  # NEW: Get LDZ for this row to recalculate base rates with start date
+        ldz = match_postcode_to_ldz(postcode, ldz_df)
+        
+        for duration in [12, 24, 36]:
             try:
-                kwh = float(row.get("Annual Consumption KWh", 0) or 0)
+                # NEW: Recalculate base rates with start date
+                base_sc, base_unit = get_base_rates(ldz, kwh, duration, carbon_offset_required, flat_df, start_date=row_start_date)
+                
+                # Update the base rates in the dataframe
+                updated_df.at[i, f"Standing Charge (Base {duration}m)"] = round(base_sc, 2)
+                updated_df.at[i, f"Unit Rate (Base {duration}m)"] = round(base_unit, 3)
+                
+                # Get uplifts
+                uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
+                uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
             except (ValueError, TypeError):
-                kwh = 0.0
+                base_sc = base_unit = uplift_sc = uplift_unit = 0.0
 
-            if not postcode or kwh <= 0:
-                continue
+            final_sc = base_sc + uplift_sc
+            final_unit = base_unit + uplift_unit
+            sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
 
-            for duration in [12, 24, 36]:
-                try:
-                    base_sc = float(row.get(f"Standing Charge (Base {duration}m)", 0) or 0)
-                    base_unit = float(row.get(f"Unit Rate (Base {duration}m)", 0) or 0)
-                    uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
-                    uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
-                except (ValueError, TypeError):
-                    base_sc = base_unit = uplift_sc = uplift_unit = 0.0
+            updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
+            updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
+            updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
+            updated_df.at[i, f"Margin £({duration}m)"] = margin
 
-                final_sc = base_sc + uplift_sc
-                final_unit = base_unit + uplift_unit
-                sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
-
-                updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
-                updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
-                updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
-                updated_df.at[i, f"Margin £({duration}m)"] = margin
-
-        st.session_state.input_df = updated_df
-        st.success("✅ Rates calculated successfully!")
-        st.rerun()
+    st.session_state.input_df = updated_df
+    st.success("✅ Rates calculated successfully!")
+    st.rerun()
 
     # -----------------------------------------
     # Step 6: Customer Quote Preview
