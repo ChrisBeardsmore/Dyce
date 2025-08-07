@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 from datetime import datetime
-from utils.llf import load_llf_mapping, get_llf_band
+from ..utils.llf import load_llf_mapping, get_llf_band
 
 st.set_page_config(page_title="Direct Sales LLF Multi-tool", layout="wide")
 st.title("Direct Sales LLF Multi-tool")
