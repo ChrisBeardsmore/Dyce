@@ -650,3 +650,5 @@ if __name__ == "__main__":
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
                         df.to_excel(writer, sheet_name='Contract_Data', index=False)
                     excel_data = output.getvalue()
+                    
+                 
