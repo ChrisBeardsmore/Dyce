@@ -148,13 +148,12 @@ if uploaded_file:
         edited_df = st.data_editor(st.session_state.input_df, use_container_width=True, num_rows="dynamic", hide_index=True, column_config=column_config, key=grid_key)
         st.session_state.input_df = edited_df.copy()
 
-        # Calculate Rates Button
+        # Calculate Rates Button (FIXED - using yesterday's working logic)
         if st.button("🔄 Calculate Rates"):
             updated_df = st.session_state.input_df.copy()
 
             for i, row in updated_df.iterrows():
                 postcode = str(row.get("Post Code", "") or "").strip()
-                
                 try:
                     kwh = float(row.get("Annual Consumption KWh", 0) or 0)
                 except (ValueError, TypeError):
@@ -163,28 +162,23 @@ if uploaded_file:
                 if not postcode or kwh <= 0:
                     continue
 
-                ldz = match_postcode_to_ldz(postcode, ldz_df)
-                
                 for duration in [12, 24, 36]:
                     try:
                         base_sc = float(row.get(f"Standing Charge (Base {duration}m)", 0) or 0)
                         base_unit = float(row.get(f"Unit Rate (Base {duration}m)", 0) or 0)
                         uplift_sc = float(row.get(f"Standing Charge (uplift {duration}m)", 0) or 0)
                         uplift_unit = float(row.get(f"Unit Rate (Uplift {duration}m)", 0) or 0)
-                        
-                        final_sc = base_sc + uplift_sc
-                        final_unit = base_unit + uplift_unit
-                        
-                        sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+                    except (ValueError, TypeError):
+                        base_sc = base_unit = uplift_sc = uplift_unit = 0.0
 
-                        updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
-                        updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
-                        updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
-                        updated_df.at[i, f"Margin £({duration}m)"] = margin
+                    final_sc = base_sc + uplift_sc
+                    final_unit = base_unit + uplift_unit
+                    sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
 
-                    except Exception as e:
-                        st.warning(f"Error calculating row {i+1}, {duration}m: {e}")
-                        continue
+                    updated_df.at[i, f"Sell Standing Charge ({duration}m)"] = round(final_sc, 2)
+                    updated_df.at[i, f"Sell Unit Rate ({duration}m)"] = round(final_unit, 3)
+                    updated_df.at[i, f"TAC ({duration}m)"] = sell_tac
+                    updated_df.at[i, f"Margin £({duration}m)"] = margin
 
             st.session_state.input_df = updated_df
             st.success("✅ Rates calculated successfully!")
