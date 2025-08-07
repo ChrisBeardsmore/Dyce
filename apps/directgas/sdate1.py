@@ -131,31 +131,42 @@ if uploaded_file:
        with st.form("calculate_rates_form"):
     st.markdown("✅ Click below to apply uplifts and recalculate all sell prices and TAC values.")
     submitted = st.form_submit_button("🔄 Calculate Rates")
+
     if submitted:
         updated_df = st.session_state.input_df.copy()
+
         for i, row in updated_df.iterrows():
             try:
                 kwh = float(row.get("Annual Consumption KWh", 0) or 0)
             except (ValueError, TypeError):
                 kwh = 0.0
+
             if kwh <= 0:
                 continue
+
             for d in [12, 24, 36]:
                 try:
                     base_sc = float(row.get(f"Standing Charge (Base {d}m)", 0) or 0)
                     base_unit = float(row.get(f"Unit Rate (Base {d}m)", 0) or 0)
                     uplift_sc = float(row.get(f"Standing Charge (uplift {d}m)", 0) or 0)
                     uplift_unit = float(row.get(f"Unit Rate (Uplift {d}m)", 0) or 0)
+
                     final_sc = base_sc + uplift_sc
                     final_unit = base_unit + uplift_unit
-                    sell_tac, margin = calculate_tac_and_margin(kwh, base_sc, base_unit, uplift_sc, uplift_unit)
+
+                    sell_tac, margin = calculate_tac_and_margin(
+                        kwh, base_sc, base_unit, uplift_sc, uplift_unit
+                    )
+
                     updated_df.at[i, f"Sell Standing Charge ({d}m)"] = round(final_sc, 2)
                     updated_df.at[i, f"Sell Unit Rate ({d}m)"] = round(final_unit, 3)
                     updated_df.at[i, f"TAC ({d}m)"] = sell_tac
                     updated_df.at[i, f"Margin £({d}m)"] = margin
+
                 except Exception as e:
                     st.warning(f"⚠️ Error calculating row {i}, {d}m: {e}")
                     continue
+
         st.session_state.input_df = updated_df
         st.success("✅ Rates calculated successfully!")
         st.rerun()
