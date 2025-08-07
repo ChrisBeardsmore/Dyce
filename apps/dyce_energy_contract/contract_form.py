@@ -1,8 +1,14 @@
 import streamlit as st
 import pandas as pd
 import json
+import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from datetime import date, datetime
 import io
+import os
 
 # Page configuration
 st.set_page_config(
@@ -12,14 +18,128 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better styling with brand colors
+# Database setup
+def init_database():
+    conn = sqlite3.connect('contracts.db', check_same_thread=False)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contracts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contract_reference TEXT UNIQUE NOT NULL,
+            submission_timestamp TEXT NOT NULL,
+            tpi_business_name TEXT,
+            tpi_first_name TEXT,
+            tpi_last_name TEXT,
+            tpi_contact_email TEXT,
+            site_business_name TEXT,
+            site_contact_email TEXT,
+            gas_contract_length INTEGER,
+            elec_contract_length INTEGER,
+            estimated_commission REAL,
+            form_data TEXT,
+            email_sent BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    return conn
+
+# Email function
+def send_contract_email(contract_data, contract_ref):
+    try:
+        smtp_server = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('EMAIL_PORT', '587'))
+        email_user = os.getenv('EMAIL_USER')
+        email_pass = os.getenv('EMAIL_PASS')
+        office_email = os.getenv('OFFICE_EMAIL')
+        
+        if not all([email_user, email_pass, office_email]):
+            st.warning("Email configuration not complete. Contract saved locally.")
+            return False
+        
+        msg = MIMEMultipart()
+        msg['From'] = email_user
+        msg['To'] = office_email
+        msg['Subject'] = f"New Energy Contract - {contract_ref}"
+        
+        body = f"""
+New Energy Contract Submission
+============================
+
+Contract Reference: {contract_ref}
+Submission Time: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+
+TPI Details:
+- Business: {contract_data.get('tpi_business_name', 'N/A')}
+- Contact: {contract_data.get('tpi_first_name', '')} {contract_data.get('tpi_last_name', '')}
+- Email: {contract_data.get('tpi_contact_email', 'N/A')}
+
+Client Details:
+- Business: {contract_data.get('site_business_name', 'N/A')}
+- Contact: {contract_data.get('site_first_name', '')} {contract_data.get('site_last_name', '')}
+- Email: {contract_data.get('site_contact_email', 'N/A')}
+
+Contract Summary:
+- Gas Contract: {contract_data.get('gas_contract_length', 0)} months
+- Electricity Contract: {contract_data.get('elec_contract_length', 0)} months
+- Estimated Commission: £{contract_data.get('estimated_commission', 0):.2f}
+
+Full details attached.
+
+Best regards,
+Dyce Energy Contract System
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach JSON
+        json_data = json.dumps(contract_data, indent=2, default=str)
+        json_attachment = MIMEApplication(json_data.encode('utf-8'), _subtype='json')
+        json_attachment.add_header('Content-Disposition', f'attachment; filename={contract_ref}.json')
+        msg.attach(json_attachment)
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(email_user, email_pass)
+        server.send_message(msg)
+        server.quit()
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Email failed: {str(e)}")
+        return False
+
+# Save to database
+def save_contract_to_db(conn, contract_data, contract_ref):
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO contracts (
+                contract_reference, submission_timestamp, tpi_business_name, 
+                tpi_first_name, tpi_last_name, tpi_contact_email,
+                site_business_name, site_contact_email, gas_contract_length,
+                elec_contract_length, estimated_commission, form_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            contract_ref, contract_data['submission_timestamp'],
+            contract_data.get('tpi_business_name'), contract_data.get('tpi_first_name'),
+            contract_data.get('tpi_last_name'), contract_data.get('tpi_contact_email'),
+            contract_data.get('site_business_name'), contract_data.get('site_contact_email'),
+            contract_data.get('gas_contract_length'), contract_data.get('elec_contract_length'),
+            contract_data.get('estimated_commission'), json.dumps(contract_data, default=str)
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        st.error(f"Database error: {str(e)}")
+        return False
+
+# Custom CSS
 st.markdown("""
 <style>
-    /* Brand Colors:
-       Blue: rgb(154, 252, ???) - need clarification, using reasonable blue
-       Pink: rgb(222, 0, 185) = #de00b9
-    */
-    
     .main-header {
         text-align: center;
         background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
@@ -48,11 +168,6 @@ st.markdown("""
         transition: all 0.3s ease;
     }
     
-    .utility-section:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    }
-    
     .gas-section {
         border-color: #4A90E2;
         background: linear-gradient(145deg, #f8fcff 0%, #e3f2fd 100%);
@@ -63,35 +178,15 @@ st.markdown("""
         background: linear-gradient(145deg, #fdf2f8 0%, #f3e8ff 100%);
     }
     
-    .stButton > button {
-        background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        padding: 0.75rem 2rem;
-        font-weight: bold;
-        font-size: 1.1rem;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #357ABD 0%, #2563EB 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(74, 144, 226, 0.4);
-    }
-    
-    /* Form submit button special styling */
     div[data-testid="stForm"] .stButton > button {
         background: linear-gradient(135deg, #de00b9 0%, #b8008a 100%);
+        color: white;
         width: 100%;
         padding: 1rem 2rem;
         font-size: 1.2rem;
-        margin-top: 1rem;
-    }
-    
-    div[data-testid="stForm"] .stButton > button:hover {
-        background: linear-gradient(135deg, #b8008a 0%, #9a0073 100%);
-        box-shadow: 0 8px 25px rgba(222, 0, 185, 0.4);
+        border-radius: 25px;
+        border: none;
+        font-weight: bold;
     }
     
     .success-message {
@@ -101,7 +196,6 @@ st.markdown("""
         padding: 1.5rem;
         border-radius: 10px;
         margin: 1rem 0;
-        box-shadow: 0 4px 16px rgba(40, 167, 69, 0.2);
     }
     
     .info-message {
@@ -111,94 +205,34 @@ st.markdown("""
         padding: 1rem;
         border-radius: 8px;
         margin: 1rem 0;
-        box-shadow: 0 4px 16px rgba(74, 144, 226, 0.2);
-    }
-    
-    /* Streamlit specific customizations */
-    .stSelectbox > div > div {
-        border: 2px solid #ddd;
-        border-radius: 6px;
-        transition: border-color 0.3s ease;
-    }
-    
-    .stSelectbox > div > div:focus-within {
-        border-color: #4A90E2;
-        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
-    }
-    
-    .stTextInput > div > div > input {
-        border: 2px solid #ddd;
-        border-radius: 6px;
-        transition: border-color 0.3s ease;
-    }
-    
-    .stTextInput > div > div > input:focus {
-        border-color: #4A90E2;
-        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
-    }
-    
-    .stNumberInput > div > div > input {
-        border: 2px solid #ddd;
-        border-radius: 6px;
-        transition: border-color 0.3s ease;
-    }
-    
-    .stNumberInput > div > div > input:focus {
-        border-color: #de00b9;
-        box-shadow: 0 0 0 2px rgba(222, 0, 185, 0.2);
-    }
-    
-    /* Header customization */
-    .main .block-container {
-        padding-top: 1rem;
-        max-width: 1200px;
-    }
-    
-    /* Radio button styling */
-    .stRadio > div {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    
-    /* Checkbox styling */
-    .stCheckbox > label {
-        font-weight: 500;
-        color: #2c3e50;
-    }
-    
-    /* Sidebar hide */
-    .css-1d391kg {
-        display: none;
-    }
-    
-    /* Custom metric styling */
-    .metric-container {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #4A90E2;
-        margin: 0.5rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
-if 'form_submitted' not in st.session_state:
-    st.session_state.form_submitted = False
+# Initialize database
+if 'db_initialized' not in st.session_state:
+    conn = init_database()
+    st.session_state.db_initialized = True
+    st.session_state.db_connection = conn
 
 def main():
-    # Header
-    st.markdown("""
-    <div class="main-header">
-        <h1>⚡ Dyce Energy</h1>
-        <h2>Contract Acceptance Form</h2>
-        <p>Energy Supply Agreement - Please complete all sections</p>
-        <div style="margin-top: 1rem; padding: 0.5rem; background: rgba(222, 0, 185, 0.1); border-radius: 5px; display: inline-block;">
-            <strong>✨ Streamlit Powered</strong>
+    # Header with Logo
+    col_logo, col_title = st.columns([1, 3])
+    
+    with col_logo:
+        try:
+            st.image("logo.png", width=150)
+        except:
+            st.markdown("⚡", unsafe_allow_html=True)
+    
+    with col_title:
+        st.markdown("""
+        <div style="padding-top: 2rem;">
+            <h1 style="color: #4A90E2; margin-bottom: 0.5rem;">Dyce Energy</h1>
+            <h2 style="color: #de00b9; margin-bottom: 0.5rem;">Contract Acceptance Form</h2>
+            <p style="color: #666; font-size: 1.1rem;">Energy Supply Agreement - Please complete all sections</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     # Create form
     with st.form("energy_contract_form", clear_on_submit=False):
@@ -211,7 +245,7 @@ def main():
             tpi_business_name = st.text_input("Business Name *", key="tpi_business_name")
             tpi_first_name = st.text_input("First Name *", key="tpi_first_name")
         with col2:
-            st.write("")  # Spacer
+            st.write("")
             tpi_last_name = st.text_input("Last Name *", key="tpi_last_name")
         
         col3, col4 = st.columns(2)
@@ -241,7 +275,7 @@ def main():
             site_first_name = st.text_input("First Name *", key="site_first_name")
             site_contact_email = st.text_input("Contact Email *", key="site_contact_email")
         with col8:
-            st.write("")  # Spacer
+            st.write("")
             site_last_name = st.text_input("Last Name *", key="site_last_name")
             site_contact_tel = st.text_input("Contact Tel *", key="site_contact_tel")
 
@@ -253,7 +287,7 @@ def main():
             town = st.text_input("Town *", key="town")
         with col10:
             building_name = st.text_input("Building Name", key="building_name")
-            st.write("")  # Spacer for alignment
+            st.write("")
             city = st.text_input("City *", key="city")
         
         post_code = st.text_input("Post Code *", key="post_code")
@@ -319,7 +353,7 @@ def main():
             home_post_code = st.text_input("Post Code", key="home_post_code")
         with col18:
             home_building_name = st.text_input("Building Name", key="home_building_name")
-            st.write("")  # Spacer
+            st.write("")
             home_city = st.text_input("City", key="home_city")
 
         st.subheader("📍 Previous Home Address (If applicable)")
@@ -331,7 +365,7 @@ def main():
             prev_post_code = st.text_input("Post Code", key="prev_post_code")
         with col20:
             prev_building_name = st.text_input("Building Name", key="prev_building_name")
-            st.write("")  # Spacer
+            st.write("")
             prev_city = st.text_input("City", key="prev_city")
 
         # TPI Commission Details Section
@@ -382,7 +416,7 @@ def main():
             billing_town = st.text_input("Town *", key="billing_town")
         with col28:
             billing_building_name = st.text_input("Building Name", key="billing_building_name")
-            st.write("")  # Spacer
+            st.write("")
             billing_city = st.text_input("City *", key="billing_city")
         
         billing_post_code = st.text_input("Post Code *", key="billing_post_code")
@@ -424,7 +458,7 @@ def main():
         
         # Validation and submission handling
         if submitted:
-            # Collect all required fields
+            # Collect required fields
             required_fields = {
                 'TPI Business Name': tpi_business_name,
                 'TPI First Name': tpi_first_name,
@@ -462,15 +496,7 @@ def main():
             else:
                 # Collect all form data
                 form_data = {
-                    st.download_button(
-                        label="📊 Download as Excel",
-                        data=excel_data,
-                        file_name=f"contract_{contract_ref}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-
-if __name__ == "__main__":
-    main()# TPI Details
+                    # TPI Details
                     'tpi_business_name': tpi_business_name,
                     'tpi_first_name': tpi_first_name,
                     'tpi_last_name': tpi_last_name,
@@ -530,125 +556,4 @@ if __name__ == "__main__":
                     'home_city': home_city,
                     'home_post_code': home_post_code,
                     'prev_building_no': prev_building_no,
-                    'prev_building_name': prev_building_name,
-                    'prev_address_1': prev_address_1,
-                    'prev_town': prev_town,
-                    'prev_city': prev_city,
-                    'prev_post_code': prev_post_code,
-                    
-                    # TPI Commission
-                    'tpi_sc_uplift_gas': tpi_sc_uplift_gas,
-                    'tpi_unit_rate_uplift_gas': tpi_unit_rate_uplift_gas,
-                    'tpi_sc_uplift_elec': tpi_sc_uplift_elec,
-                    'tpi_unit_rate_uplift_elec': tpi_unit_rate_uplift_elec,
-                    'estimated_commission': estimated_commission,
-                    
-                    # Additional Options
-                    'advanced_saver': advanced_saver,
-                    'climate_agreement': climate_agreement,
-                    'sale_type': sale_type,
-                    'additional_sites': additional_sites,
-                    
-                    # Payment Details
-                    'billing_first_name': billing_first_name,
-                    'billing_last_name': billing_last_name,
-                    'billing_contact_tel': billing_contact_tel,
-                    'billing_contact_email': billing_contact_email,
-                    'billing_building_no': billing_building_no,
-                    'billing_building_name': billing_building_name,
-                    'billing_address_1': billing_address_1,
-                    'billing_town': billing_town,
-                    'billing_city': billing_city,
-                    'billing_post_code': billing_post_code,
-                    'billing_email_only': billing_email_only,
-                    
-                    # Privacy
-                    'contact_preferences': [pref for pref, selected in [
-                        ('mail', contact_mail), ('telephone', contact_telephone),
-                        ('sms', contact_sms), ('email', contact_email)
-                    ] if selected],
-                    
-                    # Terms & Signature
-                    'terms_accepted': terms_accepted,
-                    'signature_name': signature_name,
-                    'job_title': job_title,
-                    'signature_date': signature_date.isoformat(),
-                    
-                    # Direct Debit
-                    'dd_customer_name': dd_customer_name,
-                    'dd_account_holder': dd_account_holder,
-                    'dd_setup': dd_setup,
-                    
-                    # Metadata
-                    'submission_timestamp': datetime.now().isoformat(),
-                    'contract_reference': f"CA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                }
-                
-                # Display success message
-                st.success("✅ Contract submitted successfully!")
-                
-                contract_ref = form_data['contract_reference']
-                st.markdown(f"""
-                <div class="success-message">
-                    <h3>🎉 Submission Successful!</h3>
-                    <p><strong>Contract Reference:</strong> {contract_ref}</p>
-                    <p><strong>Submission Time:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
-                    <p><strong>Estimated TPI Commission:</strong> £{estimated_commission:.2f}</p>
-                    <p>You will receive a confirmation email shortly.</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Convert to DataFrame for display
-                df = pd.DataFrame([form_data])
-                
-                # Show contract summary
-                with st.expander("📋 Contract Summary", expanded=True):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.write("**Client Details:**")
-                        st.write(f"Business: {site_business_name}")
-                        st.write(f"Contact: {site_first_name} {site_last_name}")
-                        st.write(f"Email: {site_contact_email}")
-                        st.write(f"Phone: {site_contact_tel}")
-                        
-                        st.write("**Gas Contract:**")
-                        st.write(f"Length: {gas_contract_length} months")
-                        st.write(f"Standing Charge: {gas_standing_charge}p/day")
-                        st.write(f"Unit Rate: {gas_unit_rate}p/kWh")
-                        st.write(f"Annual Usage: {gas_annual_usage:,} kWh")
-                        
-                    with col_b:
-                        st.write("**TPI Details:**")
-                        st.write(f"Business: {tpi_business_name}")
-                        st.write(f"Contact: {tpi_first_name} {tpi_last_name}")
-                        st.write(f"Email: {tpi_contact_email}")
-                        st.write(f"Commission: £{estimated_commission:.2f}")
-                        
-                        st.write("**Electricity Contract:**")
-                        st.write(f"Length: {elec_contract_length} months")
-                        st.write(f"Standing Charge: {elec_standing_charge}p/day")
-                        st.write(f"Single Rate: {elec_unit_rate_single}p/kWh")
-                        st.write(f"Annual Usage: {elec_annual_usage:,} kWh")
-                
-                # Provide download options
-                st.subheader("📥 Download Contract Data")
-                
-                col_dl1, col_dl2 = st.columns(2)
-                with col_dl1:
-                    # JSON download
-                    json_str = json.dumps(form_data, indent=2, default=str)
-                    st.download_button(
-                        label="📄 Download as JSON",
-                        data=json_str,
-                        file_name=f"contract_{contract_ref}.json",
-                        mime="application/json"
-                    )
-                
-                with col_dl2:
-                    # Excel download
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, sheet_name='Contract_Data', index=False)
-                    excel_data = output.getvalue()
-                    
-                 
+                    'prev_building_name':
