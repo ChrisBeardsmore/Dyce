@@ -56,6 +56,27 @@ if "input_df" not in st.session_state:
 if uploaded_file:
     flat_df = load_flat_file(uploaded_file)
 
+    # Only show the rest if at least one site has been added
+    if not st.session_state.input_df.empty:
+        # Step 3: Quote Configuration
+        ...
+
+        # Step 3B: Add Sites to Quote
+        ...
+
+        # Step 4: Agent Input Grid
+        ...
+
+        # Step 5: Calculate Rates
+        ...
+
+        # Step 6: Customer Quote Preview
+        ...
+    else:
+        st.info("ℹ️ Add at least one site to enable the grid and rate calculator.")
+else:
+    st.info("📁 Please upload a supplier flat file to begin creating quotes.")
+
     # -----------------------------------------
     # Step 3: Quote Configuration
     # -----------------------------------------
@@ -297,5 +318,9 @@ if st.button("🔄 Calculate Rates"):
     else:
         st.info("👆 Add sites above to see customer quote preview")
 
+if uploaded_file:
+    flat_df = load_flat_file(uploaded_file)
+    ...
+    # all your UI logic here
 else:
     st.info("📁 Please upload a supplier flat file to begin creating quotes.")
