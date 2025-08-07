@@ -1,11 +1,11 @@
 [theme]
-# Primary theme color (blue) - rgb(154, 252, 255) assuming you meant this blue
-primaryColor = "#9afcff"
+# Primary theme color (blue) - assuming rgb(154, 252, 255) or similar blue shade
+primaryColor = "#4A90E2"
 
 # Background color (white)
 backgroundColor = "#ffffff"
 
-# Secondary background color (light gray)
+# Secondary background color (light gray)  
 secondaryBackgroundColor = "#f0f2f6"
 
 # Text color (dark gray)
@@ -13,6 +13,8 @@ textColor = "#262730"
 
 # Font family
 font = "sans serif"
+
+# Custom CSS colors for pink accent: rgb(222, 0, 185) = #de00b9
 
 [server]
 # Port configuration
