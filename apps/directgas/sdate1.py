@@ -147,7 +147,7 @@ with st.form("calculate_rates_form"):
             if kwh <= 0:
                 continue
 
-            for d in [12, 24, 36]:
+         for d in [12, 24, 36]:
                 try:
                     base_sc = float(row.get(f"Standing Charge (Base {d}m)", 0) or 0)
                     base_unit = float(row.get(f"Unit Rate (Base {d}m)", 0) or 0)
@@ -169,7 +169,8 @@ with st.form("calculate_rates_form"):
                 except Exception as e:
                     st.warning(f"⚠️ Error calculating row {i}, {d}m: {e}")
                     continue
-
+        
+  
         st.session_state.input_df = updated_df
         st.success("✅ Rates calculated successfully!")
         st.rerun()
