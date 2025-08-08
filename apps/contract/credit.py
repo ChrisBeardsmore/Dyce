@@ -7,9 +7,9 @@ from io import BytesIO
 from datetime import datetime
 from fpdf import FPDF
 
-st.set_page_config(page_title="Dyce Contract Decision Engine V2", layout="wide")
+st.set_page_config(page_title="Dyce Contract Decision Engine", layout="wide")
 
-VERSION = "2.0 - July 2025"
+VERSION = "3.0 - August 2025"
 LOGO_PATH = "shared/DYCE-DARK BG.png"
 CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx"
 SIC_CODES_URL = "inputs/Sic Codes.xlsx"
@@ -20,6 +20,9 @@ st.markdown("""
         label { color: rgb(15,42,52) !important; }
         div.stButton > button, div.stDownloadButton > button {
             background-color: rgb(222,0,185) !important; color: white !important;
+        }
+        div.stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
+            color: rgb(15,42,52) !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -76,7 +79,7 @@ sic_df = load_sic_codes()
 # ======================================================================================
 
 st.header("1️⃣ Business Information")
-business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company"])
+business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company", "Limited Liability Partnership (LLP)", "Public Limited Company (PLC)", "Community Interest Company (CIC)", "Charity", "Co-operative"])
 number_of_sites = st.number_input("Number of Sites", 1)
 annual_volume_kwh = st.number_input("Estimated Annual Volume (kWh)", 0.0)
 contract_value = st.number_input("Total Contract Spend (£)", 0.0)
@@ -104,8 +107,8 @@ if sic_code:
 st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
-ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
-payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
+ccjs = "Yes" if st.toggle("Any CCJs/Defaults in last 2 years?", False) else "No"
+payment_terms = st.selectbox("Requested Payment Terms", ["Direct Debit", "BACS"])
 
 
 # ======================================================================================
@@ -132,8 +135,8 @@ def run_decision():
         if sic_risk in ["High", "Very High"]:
             reasons.append("Referral: SIC Risk is High/Very High")
 
-        if payment_terms != "14 Days Direct Debit":
-            reasons.append("Referral: Payment terms exceed maximum allowed")
+        if payment_terms != "Direct Debit":
+            reasons.append("Referral: Payment terms - BACS selected")
 
         if unit_margin_ppkwh < config['minimum_unit_margin_ppkwh']['min']:
             reasons.append("Referral: Unit Margin below minimum")
@@ -147,17 +150,31 @@ def run_decision():
     if decision == "Declined":
         required_approver = None
     else:
-        required_approver = "Managing Director"
-        for _, row in approval_matrix_df.iterrows():
-            if (
-                number_of_sites <= row['Max Sites'] and
-                contract_value >= row['Min Annual Spend'] and
-                contract_value <= row['Max Annual Spend'] and
-                annual_volume_kwh >= row['Min Annual Volume (kWh)'] and
-                annual_volume_kwh <= row['Max Annual Volume (kWh)']
-            ):
-                required_approver = row['Role']
-                break
+        # Start with lowest level approver, escalate if needed
+        required_approver = "Managing Director"  # Default fallback
+        
+        # Define approval matrix (matching your Excel table)
+        approval_matrix = [
+            {"role": "Sales Admin", "min_sites": 1, "max_sites": 20, "min_spend": 0, "max_spend": 250000, "min_volume": 1, "max_volume": 500000},
+            {"role": "TPI/ Direct Sales Manager", "min_sites": 21, "max_sites": 50, "min_spend": 250001, "max_spend": 500000, "min_volume": 500001, "max_volume": 1000000},
+            {"role": "Commercial Manager", "min_sites": 51, "max_sites": 100, "min_spend": 500001, "max_spend": 1000000, "min_volume": 1000001, "max_volume": 1500000},
+            {"role": "Managing Director", "min_sites": 101, "max_sites": 9999, "min_spend": 1000001, "max_spend": 10000000, "min_volume": 1500001, "max_volume": 10000000}
+        ]
+        
+        # Find the appropriate approver based on criteria (only if no referrals)
+        if not any("Referral:" in reason for reason in reasons):
+            for criteria in approval_matrix:
+                if (
+                    criteria["min_sites"] <= number_of_sites <= criteria["max_sites"] and
+                    criteria["min_spend"] <= contract_value <= criteria["max_spend"] and
+                    criteria["min_volume"] <= annual_volume_kwh <= criteria["max_volume"]
+                ):
+                    required_approver = criteria["role"]
+                    break
+        
+        # Any referral automatically goes to Managing Director
+        if any("Referral:" in reason for reason in reasons):
+            required_approver = "Managing Director"
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return decision, required_approver, reasons, timestamp
