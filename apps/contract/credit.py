@@ -258,7 +258,7 @@ if st.button("Run Decision Engine"):
             st.success("✅ **No approval required** - Sales Admin level (default authorization)")
             
         elif required_approver in ["TPI/ Direct Sales Manager", "Commercial Manager"]:
-            st.warning("📋 **Next Step:** This referral requires approval. Please email the decision report to the appropriate approver.")
+            st.info("📋 **Next Step:** This referral requires approval. Please email the decision report to the appropriate approver.")
             
             # Email dropdown for manager levels only
             email_options = {
@@ -270,10 +270,12 @@ if st.button("Run Decision Engine"):
                 selected_email = email_options[required_approver]
                 st.info(f"📧 **Email to:** {selected_email}")
                 
-                # Add mailto link
+                # Add mailto link as a button instead
                 subject = f"Credit Decision Approval Required - {datetime.now().strftime('%Y%m%d')}"
-                mailto_link = f"mailto:{selected_email}?subject={subject}&body=Please find attached credit decision report requiring approval."
-                st.markdown(f"[📧 Open Email Client]({mailto_link})")
+                body = "Please find attached credit decision report requiring approval."
+                mailto_link = f"mailto:{selected_email}?subject={subject.replace(' ', '%20')}&body={body.replace(' ', '%20')}"
+                
+                st.markdown(f'<a href="{mailto_link}" target="_blank" style="text-decoration: none;"><button style="background-color: rgb(222,0,185); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">📧 Send Email</button></a>', unsafe_allow_html=True)
     
     st.write(f"**Timestamp:** {timestamp}")
 
