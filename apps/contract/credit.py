@@ -122,7 +122,7 @@ payment_terms = st.selectbox("Requested Payment Terms", ["Direct Debit", "BACS"]
 # ======================================================================================
 def run_decision():
     reasons = []
-    decision = "Approved"
+    decision = "Approved"  # Start with approved
 
     # Check for decline conditions first
     if credit_score < config['refer_threshold']['min']:
@@ -132,7 +132,7 @@ def run_decision():
         decision = "Declined"
         reasons.append("Declined: CCJs or Defaults present")
 
-    # If not declined, check for referral conditions
+    # If not declined, check all criteria for referral reasons
     if decision != "Declined":
         if config['refer_threshold']['min'] <= credit_score < config['approve_threshold']['min']:
             reasons.append("Referral: Credit Score between thresholds")
@@ -155,33 +155,26 @@ def run_decision():
         if broker_uplift_unit_rate > config['max_broker_uplift_unit_rate']['max']:
             reasons.append("Referral: Unit rate uplift exceeds maximum")
 
-        # If there are any referral reasons, change decision to Referral
+        # If ANY referral reasons exist, change decision to Referral
         if any("Referral:" in reason for reason in reasons):
             decision = "Referral"
 
     if decision == "Declined":
         required_approver = None
+    elif contract_value >= 1000000:
+        # Any deal £1M+ always goes to Managing Director
+        required_approver = "Managing Director"
+    elif decision == "Approved":
+        # Deal under £1M that passes all criteria = no approver needed
+        required_approver = "Auto-Approved"
     else:
-        # Find appropriate approver based on deal size (regardless of referrals)
-        required_approver = "Managing Director"  # Default fallback
-        
-        # Define approval matrix (matching your Excel table)
-        approval_matrix = [
-            {"role": "Sales Admin", "min_sites": 1, "max_sites": 20, "min_spend": 0, "max_spend": 250000, "min_volume": 1, "max_volume": 500000},
-            {"role": "TPI/ Direct Sales Manager", "min_sites": 21, "max_sites": 50, "min_spend": 250001, "max_spend": 500000, "min_volume": 500001, "max_volume": 1000000},
-            {"role": "Commercial Manager", "min_sites": 51, "max_sites": 100, "min_spend": 500001, "max_spend": 1000000, "min_volume": 1000001, "max_volume": 1500000},
-            {"role": "Managing Director", "min_sites": 101, "max_sites": 9999, "min_spend": 1000001, "max_spend": 10000000, "min_volume": 1500001, "max_volume": 10000000}
-        ]
-        
-        # Find the appropriate approver based on deal size criteria
-        for criteria in approval_matrix:
-            if (
-                criteria["min_sites"] <= number_of_sites <= criteria["max_sites"] and
-                criteria["min_spend"] <= contract_value <= criteria["max_spend"] and
-                criteria["min_volume"] <= annual_volume_kwh <= criteria["max_volume"]
-            ):
-                required_approver = criteria["role"]
-                break
+        # Deal under £1M with referral reasons = refer to appropriate level
+        if contract_value <= 250000:
+            required_approver = "Sales Admin"
+        elif contract_value <= 500000:
+            required_approver = "TPI/ Direct Sales Manager"
+        else:  # contract_value <= 1000000
+            required_approver = "Commercial Manager"
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return decision, required_approver, reasons, timestamp
