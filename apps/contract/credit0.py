@@ -1,3 +1,6 @@
+# ======================================================================================
+# 🔴 SECTION: METADATA, STYLE, LOGO
+# ======================================================================================
 import streamlit as st
 import pandas as pd
 from io import BytesIO
@@ -22,8 +25,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image(LOGO_PATH, width=200)
+
 st.title(f"⚡ Dyce Contract Decision Engine (v{VERSION})")
 
+
+# ======================================================================================
+# 🔴 SECTION: LOAD CONFIGURATION + APPROVAL MATRIX
+# ======================================================================================
 @st.cache_data
 def load_config():
     config_df = pd.read_excel(CONFIG_URL, sheet_name='CreditCriteria')
@@ -33,15 +41,21 @@ def load_config():
         row['Parameter']: {
             'min': float(row['Min Value']),
             'max': float(row['Max Value'])
-        } for _, row in config_df.iterrows()
+        }
+        for _, row in config_df.iterrows()
     }
 
-    approval_df['Max Sites'] = approval_df['Max Sites'].astype(int)
-    for col in ['Min Annual Spend', 'Max Annual Spend', 'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)']:
+    numeric_columns = [
+        'Min sites', 'Max Sites',
+        'Min Annual Spend', 'Max Annual Spend',  # Fixed typo here
+        'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
+    ]
+
+    for col in numeric_columns:
         approval_df[col] = (
             approval_df[col]
             .astype(str)
-            .str.replace(r'[^\d.]', '', regex=True)
+            .str.replace('[^\\d.]', '', regex=True)
             .astype(float)
         )
 
@@ -56,7 +70,11 @@ def load_sic_codes():
 config, approval_matrix_df = load_config()
 sic_df = load_sic_codes()
 
-# --- Inputs ---
+
+# ======================================================================================
+# 🔴 SECTION: USER INPUTS (BUSINESS, SIC, CREDIT)
+# ======================================================================================
+
 st.header("1️⃣ Business Information")
 business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company"])
 number_of_sites = st.number_input("Number of Sites", 1)
@@ -87,9 +105,12 @@ st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
 ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
-payment_terms = st.selectbox("Requested Payment Terms", ["7", "14", "28"])
+payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
 
-# --- Decision Logic ---
+
+# ======================================================================================
+# 🔴 SECTION: DECISION ENGINE LOGIC
+# ======================================================================================
 def run_decision():
     reasons = []
     decision = "Approved"
@@ -111,7 +132,7 @@ def run_decision():
         if sic_risk in ["High", "Very High"]:
             reasons.append("Referral: SIC Risk is High/Very High")
 
-        if int(payment_terms) > config['Requested_Payment_Terms']['max']:
+        if payment_terms != "14 Days Direct Debit":
             reasons.append("Referral: Payment terms exceed maximum allowed")
 
         if unit_margin_ppkwh < config['minimum_unit_margin_ppkwh']['min']:
@@ -130,8 +151,10 @@ def run_decision():
         for _, row in approval_matrix_df.iterrows():
             if (
                 number_of_sites <= row['Max Sites'] and
-                contract_value >= row['Min Annual Spend'] and contract_value <= row['Max Annual Spend'] and
-                annual_volume_kwh >= row['Min Annual Volume (kWh)'] and annual_volume_kwh <= row['Max Annual Volume (kWh)']
+                contract_value >= row['Min Annual Spend'] and
+                contract_value <= row['Max Annual Spend'] and
+                annual_volume_kwh >= row['Min Annual Volume (kWh)'] and
+                annual_volume_kwh <= row['Max Annual Volume (kWh)']
             ):
                 required_approver = row['Role']
                 break
@@ -139,7 +162,10 @@ def run_decision():
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return decision, required_approver, reasons, timestamp
 
-# --- PDF Export ---
+
+# ======================================================================================
+# 🔴 SECTION: PDF EXPORT + RESULTS DISPLAY
+# ======================================================================================
 class PDF(FPDF):
     def header(self):
         self.image(LOGO_PATH, x=10, y=8, w=50)
