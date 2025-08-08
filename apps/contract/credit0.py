@@ -21,6 +21,9 @@ st.markdown("""
         div.stButton > button, div.stDownloadButton > button {
             background-color: rgb(222,0,185) !important; color: white !important;
         }
+        div.stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
+            color: rgb(15,42,52) !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +79,7 @@ sic_df = load_sic_codes()
 # ======================================================================================
 
 st.header("1️⃣ Business Information")
-business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company"])
+business_type = st.selectbox("Business Type", ["Sole Trader", "Partnership", "Limited Company", "Limited Liability Partnership (LLP)", "Public Limited Company (PLC)", "Community Interest Company (CIC)", "Charity", "Co-operative"])
 number_of_sites = st.number_input("Number of Sites", 1)
 annual_volume_kwh = st.number_input("Estimated Annual Volume (kWh)", 0.0)
 contract_value = st.number_input("Total Contract Spend (£)", 0.0)
@@ -105,7 +108,7 @@ st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
 ccjs = st.radio("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
-payment_terms = st.selectbox("Requested Payment Terms", ["14 Days Direct Debit", "14 Days BACS", "28 Days BACS"])
+payment_terms = st.selectbox("Requested Payment Terms", ["Direct Debit", "BACS"])
 
 
 # ======================================================================================
@@ -132,8 +135,8 @@ def run_decision():
         if sic_risk in ["High", "Very High"]:
             reasons.append("Referral: SIC Risk is High/Very High")
 
-        if payment_terms != "14 Days Direct Debit":
-            reasons.append("Referral: Payment terms exceed maximum allowed")
+        if payment_terms != "Direct Debit":
+            reasons.append("Referral: Payment terms - BACS selected")
 
         if unit_margin_ppkwh < config['minimum_unit_margin_ppkwh']['min']:
             reasons.append("Referral: Unit Margin below minimum")
