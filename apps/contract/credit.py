@@ -249,6 +249,32 @@ if st.button("Run Decision Engine"):
     st.write(f"**Final Decision:** {final_decision}")
     if required_approver:
         st.write(f"**Required Approver:** {required_approver}")
+        
+        # Email actions based on approver level
+        if required_approver == "Managing Director":
+            st.info("📧 **Action Required:** Please email this decision report to: **TenderApprovals@dyce-energy.co.uk**")
+        
+        elif required_approver == "Sales Admin":
+            st.success("✅ **No approval required** - Sales Admin level (default authorization)")
+            
+        elif required_approver in ["TPI/ Direct Sales Manager", "Commercial Manager"]:
+            st.warning("📋 **Next Step:** This referral requires approval. Please email the decision report to the appropriate approver.")
+            
+            # Email dropdown for manager levels only
+            email_options = {
+                "TPI/ Direct Sales Manager": "dan.owen@dyce-energy.co.uk", 
+                "Commercial Manager": "chris.beardsmore@dyce-energy.co.uk"
+            }
+            
+            if required_approver in email_options:
+                selected_email = email_options[required_approver]
+                st.info(f"📧 **Email to:** {selected_email}")
+                
+                # Add mailto link
+                subject = f"Credit Decision Approval Required - {datetime.now().strftime('%Y%m%d')}"
+                mailto_link = f"mailto:{selected_email}?subject={subject}&body=Please find attached credit decision report requiring approval."
+                st.markdown(f"[📧 Open Email Client]({mailto_link})")
+    
     st.write(f"**Timestamp:** {timestamp}")
 
     st.markdown("**Reasons / Stipulations:**")
