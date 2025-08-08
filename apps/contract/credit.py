@@ -156,7 +156,7 @@ def run_decision():
     if decision == "Declined":
         required_approver = None
     else:
-        # Start with lowest level approver, escalate if needed
+        # Find appropriate approver based on deal size (regardless of referrals)
         required_approver = "Managing Director"  # Default fallback
         
         # Define approval matrix (matching your Excel table)
@@ -167,20 +167,15 @@ def run_decision():
             {"role": "Managing Director", "min_sites": 101, "max_sites": 9999, "min_spend": 1000001, "max_spend": 10000000, "min_volume": 1500001, "max_volume": 10000000}
         ]
         
-        # Find the appropriate approver based on criteria (only if no referrals)
-        if not any("Referral:" in reason for reason in reasons):
-            for criteria in approval_matrix:
-                if (
-                    criteria["min_sites"] <= number_of_sites <= criteria["max_sites"] and
-                    criteria["min_spend"] <= contract_value <= criteria["max_spend"] and
-                    criteria["min_volume"] <= annual_volume_kwh <= criteria["max_volume"]
-                ):
-                    required_approver = criteria["role"]
-                    break
-        
-        # Any referral automatically goes to Managing Director
-        if any("Referral:" in reason for reason in reasons):
-            required_approver = "Managing Director"
+        # Find the appropriate approver based on deal size criteria
+        for criteria in approval_matrix:
+            if (
+                criteria["min_sites"] <= number_of_sites <= criteria["max_sites"] and
+                criteria["min_spend"] <= contract_value <= criteria["max_spend"] and
+                criteria["min_volume"] <= annual_volume_kwh <= criteria["max_volume"]
+            ):
+                required_approver = criteria["role"]
+                break
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return decision, required_approver, reasons, timestamp
