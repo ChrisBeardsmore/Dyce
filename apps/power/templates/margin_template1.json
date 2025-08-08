@@ -1,59 +1,50 @@
-import streamlit as st
-import json
-
-st.set_page_config(page_title="NHH Margin Template Builder", layout="wide")
-st.title("🔧 NHH Margin Template Builder")
-
-# --- Step 1: Set Template Name ---
-st.markdown("### 🧾 Template Metadata")
-template_name = st.text_input("Enter template name:", value="nhh_template_v1")
-
-# --- Step 2: Define Consumption Bands ---
-st.markdown("### 📊 Define Consumption Bands")
-bands = []
-num_bands = st.number_input("How many bands do you want to define?", min_value=1, max_value=10, value=5)
-
-for i in range(num_bands):
-    st.markdown(f"**Band {i+1}**")
-    cols = st.columns(2)
-    min_kwh = cols[0].number_input(f"Min kWh – Band {i+1}", key=f"min_{i}", min_value=0)
-    max_kwh = cols[1].number_input(f"Max kWh – Band {i+1}", key=f"max_{i}", min_value=min_kwh + 1)
-    bands.append({"Min": min_kwh, "Max": max_kwh})
-
-# --- Step 3: Define Uplifts Per Band ---
-st.markdown("### 💸 Uplift Inputs Per Band")
-band_uplifts = []
-
-for i, band in enumerate(bands):
-    st.markdown(f"**Band {i+1}: {band['Min']} – {band['Max']} kWh**")
-    cols = st.columns(5)
-    standard_rate = cols[0].number_input("Standard Rate (p/kWh)", min_value=0.0, key=f"sr_{i}")
-    day_rate = cols[1].number_input("Day Rate (p/kWh)", min_value=0.0, key=f"dr_{i}")
-    night_rate = cols[2].number_input("Night Rate (p/kWh)", min_value=0.0, key=f"nr_{i}")
-    ew_rate = cols[3].number_input("E&W Rate (p/kWh)", min_value=0.0, key=f"ew_{i}")
-    standing_charge = cols[4].number_input("Standing Charge (p/day)", min_value=0.0, key=f"sc_{i}")
-
-    band_uplifts.append({
-        "Min": band["Min"],
-        "Max": band["Max"],
-        "Standard_Rate": standard_rate,
-        "Day_Rate": day_rate,
-        "Night_Rate": night_rate,
-        "Evening_And_Weekend_Rate": ew_rate,
-        "Standing_Charge": standing_charge
-    })
-
-# --- Step 4: Save Template ---
-st.markdown("### 💾 Save Margin Template")
-if st.button("Download Margin Template"):
-    template = {
-        "template_name": template_name,
-        "bands": band_uplifts
+{
+  "template_name": "nhh_template_v1",
+  "bands": [
+    {
+      "Min": 0,
+      "Max": 5000,
+      "Standard_Rate": 1.5,
+      "Day_Rate": 1.2,
+      "Night_Rate": 0.8,
+      "Evening_And_Weekend_Rate": 1.0,
+      "Standing_Charge": 25.0
+    },
+    {
+      "Min": 5000,
+      "Max": 15000,
+      "Standard_Rate": 1.2,
+      "Day_Rate": 1.0,
+      "Night_Rate": 0.6,
+      "Evening_And_Weekend_Rate": 0.8,
+      "Standing_Charge": 20.0
+    },
+    {
+      "Min": 15000,
+      "Max": 50000,
+      "Standard_Rate": 1.0,
+      "Day_Rate": 0.8,
+      "Night_Rate": 0.5,
+      "Evening_And_Weekend_Rate": 0.6,
+      "Standing_Charge": 15.0
+    },
+    {
+      "Min": 50000,
+      "Max": 150000,
+      "Standard_Rate": 0.8,
+      "Day_Rate": 0.6,
+      "Night_Rate": 0.4,
+      "Evening_And_Weekend_Rate": 0.5,
+      "Standing_Charge": 10.0
+    },
+    {
+      "Min": 150000,
+      "Max": 500000,
+      "Standard_Rate": 0.6,
+      "Day_Rate": 0.4,
+      "Night_Rate": 0.3,
+      "Evening_And_Weekend_Rate": 0.4,
+      "Standing_Charge": 5.0
     }
-    json_data = json.dumps(template, indent=4)
-    st.download_button(
-        label="⬇️ Download JSON File",
-        data=json_data,
-        file_name=f"{template_name}.json",
-        mime="application/json"
-    )
+  ]
+}
