@@ -113,7 +113,7 @@ if sic_code:
 st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
-ccjs = "Yes" if st.checkbox("Any CCJs/Defaults in last 2 years?", False) else "No"
+ccjs = st.selectbox("Any CCJs/Defaults in last 2 years?", ["No", "Yes"])
 payment_terms = st.selectbox("Requested Payment Terms", ["Direct Debit", "BACS"])
 
 
