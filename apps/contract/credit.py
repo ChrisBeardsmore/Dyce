@@ -24,6 +24,12 @@ st.markdown("""
         div.stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
             color: rgb(15,42,52) !important;
         }
+        div.stCheckbox > label > div[data-testid="stMarkdownContainer"] > p {
+            color: rgb(15,42,52) !important;
+        }
+        div.stCheckbox > label {
+            color: rgb(15,42,52) !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
