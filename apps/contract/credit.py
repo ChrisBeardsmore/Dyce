@@ -7,9 +7,9 @@ from io import BytesIO
 from datetime import datetime
 from fpdf import FPDF
 
-st.set_page_config(page_title="Dyce Contract Decision Engine", layout="wide")
+st.set_page_config(page_title="Dyce Contract Decision Engine V2", layout="wide")
 
-VERSION = "3.0 - August 2025"
+VERSION = "2.0 - July 2025"
 LOGO_PATH = "shared/DYCE-DARK BG.png"
 CONFIG_URL = "inputs/Credit_Decision_Config_Template.xlsx"
 SIC_CODES_URL = "inputs/Sic Codes.xlsx"
@@ -107,7 +107,7 @@ if sic_code:
 st.header("3️⃣ Credit Information")
 credit_score = st.number_input("Creditsafe Score", 0, 100)
 years_trading = st.number_input("Years Trading", 0)
-ccjs = "Yes" if st.toggle("Any CCJs/Defaults in last 2 years?", False) else "No"
+ccjs = "Yes" if st.checkbox("Any CCJs/Defaults in last 2 years?", False) else "No"
 payment_terms = st.selectbox("Requested Payment Terms", ["Direct Debit", "BACS"])
 
 
