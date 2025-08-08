@@ -47,7 +47,7 @@ def load_config():
 
     numeric_columns = [
         'Min sites', 'Max Sites',
-        'Min Annual Spend', 'Max Annual Apend',
+        'Min Annual Spend', 'Max Annual Spend',  # Fixed typo here
         'Min Annual Volume (kWh)', 'Max Annual Volume (kWh)'
     ]
 
