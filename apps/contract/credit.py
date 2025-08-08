@@ -124,6 +124,7 @@ def run_decision():
     reasons = []
     decision = "Approved"
 
+    # Check for decline conditions first
     if credit_score < config['refer_threshold']['min']:
         decision = "Declined"
         reasons.append("Declined: Credit Score below referral threshold")
@@ -131,6 +132,7 @@ def run_decision():
         decision = "Declined"
         reasons.append("Declined: CCJs or Defaults present")
 
+    # If not declined, check for referral conditions
     if decision != "Declined":
         if config['refer_threshold']['min'] <= credit_score < config['approve_threshold']['min']:
             reasons.append("Referral: Credit Score between thresholds")
@@ -152,6 +154,10 @@ def run_decision():
 
         if broker_uplift_unit_rate > config['max_broker_uplift_unit_rate']['max']:
             reasons.append("Referral: Unit rate uplift exceeds maximum")
+
+        # If there are any referral reasons, change decision to Referral
+        if any("Referral:" in reason for reason in reasons):
+            decision = "Referral"
 
     if decision == "Declined":
         required_approver = None
